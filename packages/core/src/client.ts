@@ -39,15 +39,21 @@ function base64Utf8(input: string): string {
 }
 
 /**
- * Redact sensitive header patterns from error response bodies before storing.
- * Per audit finding H2 — bodies are commonly logged, and a misbehaving proxy
- * or debug endpoint can echo the inbound Authorization header back.
+ * Redact sensitive header + credential patterns from error response bodies
+ * before storing them on `BtxHttpError.body` (which callers commonly log).
+ *
+ * Covers:
+ *   - Authorization header echoes from proxies / debug endpoints (H2)
+ *   - JSON `"password"` / `"rpcpassword"` fields
+ *   - Config-line `rpcuser=...` / `rpcpassword=...` from btxd's loadincludeconf
+ *     error paths (re-audit N2 — added 2026-05-20)
  */
 function redactSensitive(body: string): string {
   return body
     .replace(/authorization\s*:\s*basic\s+[A-Za-z0-9+/=]+/gi, 'authorization: basic [REDACTED]')
     .replace(/"password"\s*:\s*"[^"]*"/gi, '"password":"[REDACTED]"')
-    .replace(/"rpcpassword"\s*:\s*"[^"]*"/gi, '"rpcpassword":"[REDACTED]"');
+    .replace(/"rpcpassword"\s*:\s*"[^"]*"/gi, '"rpcpassword":"[REDACTED]"')
+    .replace(/\b(rpc(?:user|password|auth))\s*=\s*\S+/gi, '$1=[REDACTED]');
 }
 
 /** Generate a stable-uniqueness request id without colliding across instances. */

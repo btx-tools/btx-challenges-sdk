@@ -172,7 +172,7 @@ describe('BtxChallengeClient — error normalization', () => {
     await expect(client.call('boom')).rejects.toBeInstanceOf(BtxRpcError);
   });
 
-  it('maps non-2xx HTTP → BtxHttpError with redacted body', async () => {
+  it('maps non-2xx HTTP → BtxHttpError with redacted body (H2)', async () => {
     server.use(
       http.post(RPC_URL, () =>
         HttpResponse.text(
@@ -192,6 +192,31 @@ describe('BtxChallengeClient — error normalization', () => {
       // Audit H2: Authorization header in body must be redacted.
       expect(e.body).not.toContain('dXNlcjpwYXNz');
       expect(e.body).toContain('[REDACTED]');
+    }
+  });
+
+  it('redacts btxd config-line credentials in error bodies (re-audit N2)', async () => {
+    server.use(
+      http.post(RPC_URL, () =>
+        HttpResponse.text(
+          'failed to load conf:\nrpcuser=alice\nrpcpassword=hunter2\nrpcauth=alice:abc$def',
+          { status: 500 },
+        ),
+      ),
+    );
+    const client = makeClient();
+    try {
+      await client.call('debug');
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(BtxHttpError);
+      const e = err as BtxHttpError;
+      expect(e.body).not.toContain('hunter2');
+      expect(e.body).not.toContain('alice:abc$def');
+      // alice as rpcuser=value should also redact the value side
+      expect(e.body).toContain('rpcuser=[REDACTED]');
+      expect(e.body).toContain('rpcpassword=[REDACTED]');
+      expect(e.body).toContain('rpcauth=[REDACTED]');
     }
   });
 
