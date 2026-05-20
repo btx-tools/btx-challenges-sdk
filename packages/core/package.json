@@ -1,0 +1,72 @@
+{
+  "name": "@btx/challenges-sdk",
+  "version": "0.0.1",
+  "description": "TypeScript SDK for BTX service challenges — chain-anchored proof-of-work admission control for APIs, agent gateways, and form submissions",
+  "author": "visitor-code <visitor@friction.market>",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "prepublishOnly": "pnpm build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "msw": "^2.6.0",
+    "prettier": "^3.3.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "keywords": [
+    "btx",
+    "service-challenges",
+    "matmul",
+    "post-quantum",
+    "captcha",
+    "admission",
+    "rate-limit",
+    "ai-gating",
+    "agent",
+    "mcp",
+    "proof-of-work"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/visitor-code/btx-challenges-sdk.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/visitor-code/btx-challenges-sdk/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/visitor-code/btx-challenges-sdk/issues"
+  },
+  "engines": {
+    "node": ">=18.17"
+  }
+}

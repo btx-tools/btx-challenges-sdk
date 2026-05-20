@@ -14,7 +14,7 @@
 
 import { execSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import type { Challenge, VerifyResult } from '../src/types.js';
+import type { Challenge, VerifyResult } from '../../src/types.js';
 
 const SSH_TARGET = 'btx-iowa';
 const BTX_CLI = '/root/btx-src/btx/build/bin/btx-cli';

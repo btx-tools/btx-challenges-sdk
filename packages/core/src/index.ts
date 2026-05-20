@@ -8,16 +8,27 @@
  */
 
 export { BtxChallengeClient } from './client.js';
+export { Solver } from './solver.js';
 export {
+  BtxError,
   BtxHttpError,
+  BtxNetworkError,
+  BtxParseError,
   BtxRpcError,
+  BtxTimeoutError,
   type BatchEntry,
   type BatchResult,
   type BtxClientOpts,
   type Challenge,
+  type ChallengeBinding,
+  type ChallengeHeaderContext,
+  type ChallengeMatmul,
+  type ChallengePayload,
+  type ChallengeProofPolicy,
   type ChallengePurpose,
   type DifficultyPolicy,
   type IssueParams,
   type SolverOutput,
+  type VerifyReason,
   type VerifyResult,
 } from './types.js';

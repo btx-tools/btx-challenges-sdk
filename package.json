@@ -1,54 +1,25 @@
 {
-  "name": "@btx/challenges-sdk",
+  "name": "btx-challenges-sdk-workspace",
+  "private": true,
   "version": "0.0.1",
-  "description": "TypeScript SDK for BTX service challenges — chain-anchored proof-of-work admission control for APIs, agent gateways, and form submissions",
+  "description": "BTX service-challenges SDK — workspace root (private; publishable packages live in packages/*)",
   "author": "visitor-code <visitor@friction.market>",
   "license": "MIT",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "files": ["dist", "README.md", "LICENSE"],
+  "packageManager": "pnpm@10.29.3",
   "scripts": {
-    "build": "tsup",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:smoke": "vitest run tests/smoke.test.ts",
-    "type-check": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\""
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm -r --filter './packages/*' test -- --project unit",
+    "type-check": "pnpm -r type-check",
+    "format": "prettier --write \"packages/**/*.{ts,json,md}\" \"*.{json,md,yml,yaml}\"",
+    "clean": "pnpm -r exec rm -rf dist node_modules .turbo"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "prettier": "^3.3.0",
-    "tsup": "^8.3.0",
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
-  },
-  "keywords": [
-    "btx",
-    "service-challenges",
-    "matmul",
-    "post-quantum",
-    "captcha",
-    "admission",
-    "rate-limit",
-    "ai-gating",
-    "agent",
-    "mcp",
-    "proof-of-work"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/visitor-code/btx-challenges-sdk.git"
+    "prettier": "^3.3.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.17",
+    "pnpm": ">=10"
   }
 }
