@@ -11,10 +11,12 @@
  * any of our fleet rentals, `solvematmulservicechallenge` queues behind
  * block work and takes 5+ minutes — unusable for a test loop.
  *
- * Day 2 measurement (2026-05-20 against btx-iowa via SSH tunnel):
+ * Day 2 measurement (2026-05-20 against btx-iowa via SSH tunnel + direct
+ * SSH-piped fallback to confirm):
  *   - HTTP/auth path: ✅ works (200 OK on getblockcount in milliseconds)
  *   - getmatmulservicechallenge: ✅ ~3s
- *   - solvematmulservicechallenge: ❌ >5 min (timed out at 300_000 ms)
+ *   - solvematmulservicechallenge: ❌ ~15 min (btx-cli's own transient-
+ *     error timeout fired at 900s; SDK 300s timeout fires sooner)
  *
  * To run this suite usefully, point at a btxd with mining DISABLED:
  *   # Spin up a $5 DO droplet OR a clone of iowa with btx.conf gen=0:
