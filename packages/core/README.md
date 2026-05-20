@@ -131,7 +131,7 @@ const proof = await Solver.solve(challenge, { rpcClient: client });
 
 #### ⚠️ Deployment note — don't point Solver at a mining btxd
 
-btxd's service-challenge solver shares the matmul backend with block-template mining. On a node that's actively mining, `solvematmulservicechallenge` queues behind block work and can take **5+ minutes** per call — unusable in production.
+btxd's service-challenge solver shares the matmul backend with block-template mining. On a node that's actively mining, `solvematmulservicechallenge` queues behind block work and can take **15+ minutes** per call — measured 2026-05-20 on a production mining rental, where the solve RPC didn't return even after `btx-cli`'s own 15-minute transient-error timeout fired.
 
 For Solver to work at advertised latency (~1–4 seconds), point it at a **dedicated btxd** that is NOT mining (e.g., a $5/mo DO droplet with `gen=0` in `btx.conf`). The SDK itself works fine — the bottleneck is the upstream solver service-sharing.
 

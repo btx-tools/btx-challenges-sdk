@@ -17,7 +17,7 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 #### Day 2 deployment finding
 
-btxd's `solvematmulservicechallenge` RPC shares matmul backend with block mining. On any mining-loaded node (mining-loaded nodes), the solve RPC takes >5 minutes — unusable. Solver users MUST point at a dedicated non-mining btxd (e.g., $5/mo DO droplet with `gen=0`). Documented in README. Day 2.5 pure-JS solver removes this constraint for browser clients.
+btxd's `solvematmulservicechallenge` RPC shares matmul backend with block mining. On any mining-loaded node (mining-loaded nodes), the solve RPC takes 15+ minutes — direct SSH-piped measurement on btx-node 2026-05-20 ran 900s before btx-cli's own transient-error timeout fired. Solver users MUST point at a dedicated non-mining btxd (e.g., $5/mo DO droplet with `gen=0`). Documented in README. Day 2.5 pure-JS solver removes this constraint for browser clients.
 
 #### Added (Day 1 + Wave A/B/C)
 
