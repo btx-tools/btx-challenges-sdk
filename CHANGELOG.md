@@ -6,6 +6,19 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ### @btx/challenges-sdk
 
+#### Day 2 — Solver class (RPC mode)
+
+- `Solver` class with mode dispatch (`'rpc' | 'pure-js' | 'auto'`)
+  - **`mode: 'rpc'`** — delegates to `BtxChallengeClient.solve()` → btxd's `solvematmulservicechallenge`. **Server-side / Node only.** Ships v0.0.1.
+  - **`mode: 'pure-js'`** — placeholder; throws `not_implemented` with pointer to Day 2.5 work.
+  - **`mode: 'auto'`** (default) — picks `'rpc'` if `opts.rpcClient` provided, else `'pure-js'`.
+- 10 unit tests cover dispatch (rpc / pure-js / auto), error propagation, default mode behavior
+- Integration test for full `issue → Solver.solve(rpc) → redeem` lifecycle — **gated on `BTX_INTEGRATION_NODE_DEDICATED=1`** (see "deployment note" below)
+
+#### Day 2 deployment finding
+
+btxd's `solvematmulservicechallenge` RPC shares matmul backend with block mining. On any mining-loaded node (mining-loaded nodes), the solve RPC takes >5 minutes — unusable. Solver users MUST point at a dedicated non-mining btxd (e.g., $5/mo DO droplet with `gen=0`). Documented in README. Day 2.5 pure-JS solver removes this constraint for browser clients.
+
 #### Added (Day 1 + Wave A/B/C)
 
 - `BtxChallengeClient` wrapping 6 service-challenges RPCs (`issue`, `verify`, `redeem`, `verifyBatch`, `redeemBatch`, `solve`) + low-level `call()` escape hatch

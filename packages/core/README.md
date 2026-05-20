@@ -113,14 +113,27 @@ Error response bodies are scanned and `Authorization: Basic <token>` patterns ar
 
 ### `Solver`
 
-```typescript
-import { Solver } from '@btx/challenges-sdk';
+Day 2 ships **RPC mode** — delegates solving to btxd's `solvematmulservicechallenge`. Server-side / Node only.
 
-// DAY 1 STUB — throws not_implemented. Real impl ships Day 2.
-const proof = await Solver.solve(challenge);
+```typescript
+import { BtxChallengeClient, Solver } from '@btx/challenges-sdk';
+
+const client = new BtxChallengeClient({ rpcUrl: '...', rpcAuth: { ... } });
+
+// Server-side: delegate solving to btxd
+const proof = await Solver.solve(challenge, { mode: 'rpc', rpcClient: client });
+
+// Or just pass rpcClient — 'auto' mode picks rpc when available
+const proof = await Solver.solve(challenge, { rpcClient: client });
 ```
 
-Browser-side / client-side MatMul solver. Day 1 ships the type signature; Day 2 ports the actual solver from btxd source.
+**Pure-JS / browser mode** ships Day 2.5 (`mode: 'pure-js'` currently throws not_implemented). When it lands, the same API works in a browser without an `rpcClient`.
+
+#### ⚠️ Deployment note — don't point Solver at a mining btxd
+
+btxd's service-challenge solver shares the matmul backend with block-template mining. On a node that's actively mining, `solvematmulservicechallenge` queues behind block work and can take **5+ minutes** per call — unusable in production.
+
+For Solver to work at advertised latency (~1–4 seconds), point it at a **dedicated btxd** that is NOT mining (e.g., a $5/mo DO droplet with `gen=0` in `btx.conf`). The SDK itself works fine — the bottleneck is the upstream solver service-sharing.
 
 ## Roadmap
 
