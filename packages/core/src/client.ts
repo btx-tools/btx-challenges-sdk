@@ -61,8 +61,10 @@ function nextRequestId(): string {
   // Both Node 18.17+ and modern browsers expose globalThis.crypto.randomUUID.
   const c = globalThis.crypto;
   if (c && typeof c.randomUUID === 'function') return c.randomUUID();
-  // Last-resort fallback. Not cryptographically strong but uniqueness is the only
-  // need here — btxd echoes the id back, doesn't use it for auth.
+  // Last-resort fallback. NOT a security context — this id is sent as the
+  // JSON-RPC `id` field, echoed by btxd, and used only for client-side
+  // response correlation. `Math.random` is appropriate here (uniqueness, not
+  // unpredictability). btxd doesn't authenticate against this value.
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 

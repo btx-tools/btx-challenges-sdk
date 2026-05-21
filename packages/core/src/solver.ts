@@ -79,10 +79,7 @@ export interface SolverOptions {
  * ```
  */
 export class Solver {
-  static async solve(
-    challenge: Challenge,
-    opts: SolverOptions = {},
-  ): Promise<SolverOutput> {
+  static async solve(challenge: Challenge, opts: SolverOptions = {}): Promise<SolverOutput> {
     const mode: SolverMode = opts.mode ?? (opts.rpcClient ? 'rpc' : 'pure-js');
 
     switch (mode) {
@@ -102,10 +99,7 @@ export class Solver {
   }
 }
 
-async function solveViaRpc(
-  challenge: Challenge,
-  opts: SolverOptions,
-): Promise<SolverOutput> {
+async function solveViaRpc(challenge: Challenge, opts: SolverOptions): Promise<SolverOutput> {
   if (!opts.rpcClient) {
     throw new Error(
       'Solver.solve: mode="rpc" requires opts.rpcClient. ' +
@@ -115,10 +109,7 @@ async function solveViaRpc(
   return opts.rpcClient.solve(challenge);
 }
 
-async function solveViaPureJs(
-  challenge: Challenge,
-  opts: SolverOptions,
-): Promise<SolverOutput> {
+async function solveViaPureJs(challenge: Challenge, opts: SolverOptions): Promise<SolverOutput> {
   const result = solveJs(challenge, opts.pureJs);
   if (result === null) {
     const tries = opts.pureJs?.maxTries ?? 1_000_000;

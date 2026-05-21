@@ -219,9 +219,7 @@ describe('Solver.solve — mode dispatch (Day 2 RPC-only)', () => {
         ...pureJsChallenge,
         challenge: { ...pureJsChallenge.challenge, target: 'nothex' },
       };
-      await expect(Solver.solve(bad, { mode: 'pure-js' })).rejects.toThrow(
-        /expected 64 hex chars/,
-      );
+      await expect(Solver.solve(bad, { mode: 'pure-js' })).rejects.toThrow(/expected 64 hex chars/);
     });
   });
 

@@ -138,11 +138,7 @@ export function canonicalMatMul(
   b: number,
   sigmaBE: Uint8Array,
 ): CanonicalMatMulResult {
-  if (
-    aPrime.rows !== aPrime.cols ||
-    bPrime.rows !== bPrime.cols ||
-    aPrime.rows !== bPrime.rows
-  ) {
+  if (aPrime.rows !== aPrime.cols || bPrime.rows !== bPrime.cols || aPrime.rows !== bPrime.rows) {
     throw new Error('canonicalMatMul requires square matrices of equal size');
   }
   if (b === 0 || aPrime.rows % b !== 0) {
@@ -179,13 +175,7 @@ export function canonicalMatMul(
 // ----------------------------------------------------------------------------
 
 /** Copy `m[bi*b..bi*b+b][bj*b..bj*b+b]` into the `b·b` `out` buffer. */
-function readBlock(
-  m: Matrix,
-  bi: number,
-  bj: number,
-  b: number,
-  out: Uint32Array,
-): void {
+function readBlock(m: Matrix, bi: number, bj: number, b: number, out: Uint32Array): void {
   const rowStart = bi * b;
   const colStart = bj * b;
   const stride = m.cols;
@@ -199,13 +189,7 @@ function readBlock(
 }
 
 /** Copy a b·b `block` buffer into `m[bi*b..bi*b+b][bj*b..bj*b+b]`. */
-function writeBlock(
-  m: Matrix,
-  bi: number,
-  bj: number,
-  b: number,
-  block: Uint32Array,
-): void {
+function writeBlock(m: Matrix, bi: number, bj: number, b: number, block: Uint32Array): void {
   const rowStart = bi * b;
   const colStart = bj * b;
   const stride = m.cols;

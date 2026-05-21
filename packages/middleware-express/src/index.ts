@@ -20,7 +20,7 @@
  *              X-BTX-Proof-Nonce: <hex>
  *              X-BTX-Proof-Digest: <hex>
  *   server →   200 OK  (next() runs the actual handler;
- *                       req.btxResult is the VerifyResult)
+ *                       req.btx?.result is the VerifyResult)
  *
  *   Invalid proof → 403 with { valid: false, reason }.
  *   btxd RPC error → next(err) so Express's error handler can manage it.
@@ -73,6 +73,14 @@ export interface BtxAdmissionOpts {
   /** Optional hook fired on successful admission. Receives `req` + the redeem result. */
   onAdmit?: (req: Request, result: VerifyResult) => void;
   /**
+   * Optional hook fired when `client.issue()` or `client.redeem()` throws.
+   * Receives the original error + the request. Fires exactly once before
+   * the middleware calls `next(err)` to hand off to Express's error pipeline.
+   * Use this for logging/observability — don't mutate the error or the
+   * response. Added in 0.2.0 (audit finding D-1).
+   */
+  onError?: (err: unknown, req: Request) => void;
+  /**
    * Override the default "is the proof present?" check. By default it returns
    * true iff all of `X-BTX-Challenge`, `X-BTX-Proof-Nonce`, `X-BTX-Proof-Digest`
    * are set.
@@ -84,8 +92,15 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
-      /** Populated on successful admission with the result of `client.redeem()`. */
-      btxResult?: VerifyResult;
+      /**
+       * Namespaced container for BTX middleware state. Populated on successful
+       * admission. Renamed from `req.btxResult` in 0.2.0 to avoid global
+       * Request-augmentation pollution (audit finding C-3).
+       */
+      btx?: {
+        /** The `client.redeem()` result that admitted this request. */
+        result: VerifyResult;
+      };
     }
   }
 }
@@ -121,7 +136,7 @@ declare global {
  *     issueParams: { target_solve_time_s: 1.0, expires_in_s: 60 },
  *   }),
  *   async (req, res) => {
- *     // req.btxResult is populated with the redeem VerifyResult
+ *     // req.btx?.result is populated with the redeem VerifyResult
  *     res.json({ ok: true, generated: '...' });
  *   },
  * );
@@ -141,8 +156,8 @@ export function btxAdmission(opts: BtxAdmissionOpts): RequestHandler {
 function defaultIsProofPresent(req: Request): boolean {
   return Boolean(
     req.header(HEADER_CHALLENGE) &&
-      req.header(HEADER_PROOF_NONCE) &&
-      req.header(HEADER_PROOF_DIGEST),
+    req.header(HEADER_PROOF_NONCE) &&
+    req.header(HEADER_PROOF_DIGEST),
   );
 }
 
@@ -171,6 +186,7 @@ async function issueAndRespond(
         retry_with: [HEADER_CHALLENGE, HEADER_PROOF_NONCE, HEADER_PROOF_DIGEST],
       });
   } catch (err) {
+    opts.onError?.(err, req);
     next(err);
   }
 }
@@ -186,10 +202,13 @@ async function redeemAndAdmit(
   const digest = req.header(HEADER_PROOF_DIGEST);
 
   if (!challengeRaw) {
-    res.status(400).setHeader('Content-Type', 'application/json').json({
-      error: 'missing_challenge_header',
-      message: `Retry must include the original challenge in the ${HEADER_CHALLENGE} header (echo-back).`,
-    });
+    res
+      .status(400)
+      .setHeader('Content-Type', 'application/json')
+      .json({
+        error: 'missing_challenge_header',
+        message: `Retry must include the original challenge in the ${HEADER_CHALLENGE} header (echo-back).`,
+      });
     return;
   }
 
@@ -197,10 +216,13 @@ async function redeemAndAdmit(
   try {
     challenge = JSON.parse(challengeRaw) as Challenge;
   } catch {
-    res.status(400).setHeader('Content-Type', 'application/json').json({
-      error: 'malformed_challenge_header',
-      message: `${HEADER_CHALLENGE} must be a JSON-encoded Challenge envelope.`,
-    });
+    res
+      .status(400)
+      .setHeader('Content-Type', 'application/json')
+      .json({
+        error: 'malformed_challenge_header',
+        message: `${HEADER_CHALLENGE} must be a JSON-encoded Challenge envelope.`,
+      });
     return;
   }
 
@@ -208,10 +230,13 @@ async function redeemAndAdmit(
   // make sure it matches the embedded id.
   const idHeader = req.header(HEADER_CHALLENGE_ID);
   if (idHeader && idHeader !== challenge.challenge_id) {
-    res.status(400).setHeader('Content-Type', 'application/json').json({
-      error: 'challenge_id_mismatch',
-      message: `${HEADER_CHALLENGE_ID} does not match challenge_id in ${HEADER_CHALLENGE}.`,
-    });
+    res
+      .status(400)
+      .setHeader('Content-Type', 'application/json')
+      .json({
+        error: 'challenge_id_mismatch',
+        message: `${HEADER_CHALLENGE_ID} does not match challenge_id in ${HEADER_CHALLENGE}.`,
+      });
     return;
   }
 
@@ -225,10 +250,11 @@ async function redeemAndAdmit(
       });
       return;
     }
-    req.btxResult = result;
+    req.btx = { result };
     opts.onAdmit?.(req, result);
     next();
   } catch (err) {
+    opts.onError?.(err, req);
     next(err);
   }
 }

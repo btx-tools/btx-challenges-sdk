@@ -8,11 +8,7 @@ import express, { type Application } from 'express';
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type {
-  BtxChallengeClient,
-  Challenge,
-  VerifyResult,
-} from '@btx-tools/challenges-sdk';
+import type { BtxChallengeClient, Challenge, VerifyResult } from '@btx-tools/challenges-sdk';
 
 import {
   HEADER_CHALLENGE,
@@ -113,10 +109,12 @@ const STUB_VERIFY_ALREADY: VerifyResult = {
 };
 
 /** Build a fake BtxChallengeClient with vitest spies on issue() and redeem(). */
-function makeClient(overrides: Partial<{
-  issue: BtxChallengeClient['issue'];
-  redeem: BtxChallengeClient['redeem'];
-}> = {}): BtxChallengeClient {
+function makeClient(
+  overrides: Partial<{
+    issue: BtxChallengeClient['issue'];
+    redeem: BtxChallengeClient['redeem'];
+  }> = {},
+): BtxChallengeClient {
   return {
     issue: overrides.issue ?? vi.fn().mockResolvedValue(STUB_CHALLENGE),
     redeem: overrides.redeem ?? vi.fn().mockResolvedValue(STUB_VERIFY_OK),
@@ -131,7 +129,7 @@ function makeApp(opts: BtxAdmissionOpts, downstream?: express.RequestHandler): A
     btxAdmission(opts),
     downstream ??
       ((req, res) => {
-        res.status(200).json({ ok: true, btxResult: req.btxResult });
+        res.status(200).json({ ok: true, btxResult: req.btx?.result });
       }),
   );
   return app;
@@ -225,7 +223,7 @@ describe('btxAdmission — 402 issue path (no proof headers)', () => {
 });
 
 describe('btxAdmission — 200 admit path (valid proof)', () => {
-  it('redeems + calls next() + populates req.btxResult', async () => {
+  it('redeems + calls next() + populates req.btx.result', async () => {
     const client = makeClient();
     const app = makeApp({
       client,
@@ -244,11 +242,7 @@ describe('btxAdmission — 200 admit path (valid proof)', () => {
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
     expect(res.body.btxResult).toEqual(STUB_VERIFY_OK);
-    expect(client.redeem).toHaveBeenCalledWith(
-      STUB_CHALLENGE,
-      'abcdef0123456789',
-      '00'.repeat(32),
-    );
+    expect(client.redeem).toHaveBeenCalledWith(STUB_CHALLENGE, 'abcdef0123456789', '00'.repeat(32));
     expect(client.issue).not.toHaveBeenCalled();
   });
 
@@ -438,6 +432,80 @@ describe('btxAdmission — error propagation via next(err)', () => {
       .send({});
 
     expect(res.status).toBe(500);
+  });
+});
+
+describe('btxAdmission — onError hook (0.2.0)', () => {
+  it('fires when client.issue throws', async () => {
+    const onError = vi.fn();
+    const issueErr = new Error('btxd unreachable on issue');
+    const client = makeClient({
+      issue: vi.fn().mockRejectedValue(issueErr),
+    });
+    const app = makeApp({
+      client,
+      purpose: 'r',
+      resource: 'r',
+      subject: 's',
+      onError,
+    });
+
+    const res = await request(app).post('/gated').send({});
+    expect(res.status).toBe(500);
+    expect(onError).toHaveBeenCalledOnce();
+    const [err, req] = onError.mock.calls[0]!;
+    expect(err).toBe(issueErr);
+    expect((req as express.Request).path).toBe('/gated');
+  });
+
+  it('fires when client.redeem throws', async () => {
+    const onError = vi.fn();
+    const redeemErr = new Error('btxd unreachable on redeem');
+    const client = makeClient({
+      redeem: vi.fn().mockRejectedValue(redeemErr),
+    });
+    const app = makeApp({
+      client,
+      purpose: 'r',
+      resource: 'r',
+      subject: 's',
+      onError,
+    });
+
+    const res = await request(app)
+      .post('/gated')
+      .set(HEADER_CHALLENGE, JSON.stringify(STUB_CHALLENGE))
+      .set(HEADER_PROOF_NONCE, '01')
+      .set(HEADER_PROOF_DIGEST, '02')
+      .send({});
+
+    expect(res.status).toBe(500);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0]![0]).toBe(redeemErr);
+  });
+
+  it('does NOT fire on a non-throwing 403 (invalid_proof)', async () => {
+    const onError = vi.fn();
+    const client = makeClient({
+      redeem: vi.fn().mockResolvedValue(STUB_VERIFY_INVALID),
+    });
+    const app = makeApp({
+      client,
+      purpose: 'r',
+      resource: 'r',
+      subject: 's',
+      onError,
+    });
+
+    const res = await request(app)
+      .post('/gated')
+      .set(HEADER_CHALLENGE, JSON.stringify(STUB_CHALLENGE))
+      .set(HEADER_PROOF_NONCE, '01')
+      .set(HEADER_PROOF_DIGEST, '02')
+      .send({});
+
+    expect(res.status).toBe(403);
+    expect(onError).not.toHaveBeenCalled();
   });
 });
 

@@ -85,7 +85,9 @@ describe('matmul/header — serializeMatMulHeader', () => {
   });
 
   it('accepts hex with 0x prefix', () => {
-    expect(() => serializeMatMulHeader(makeHeader({ previousblockhash: '0x' + ZERO_HASH }))).not.toThrow();
+    expect(() =>
+      serializeMatMulHeader(makeHeader({ previousblockhash: '0x' + ZERO_HASH })),
+    ).not.toThrow();
   });
 
   it('rejects wrong-length uint256 hex', () => {

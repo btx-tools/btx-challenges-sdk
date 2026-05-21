@@ -15,13 +15,13 @@ jobs:
       matrix:
         node-version: [18, 20, 22]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
@@ -37,6 +37,16 @@ jobs:
 
       - name: Type-check
         run: pnpm -r type-check
+
+      - name: Format check (prettier)
+        # Audit finding G-4. Catches style drift before it lands on main.
+        run: pnpm -r exec prettier --check "src/**/*.ts" "tests/**/*.ts"
+
+      - name: Pack dry-run
+        # Audit finding G-3. Surfaces publish-time tarball issues (oversized
+        # files, missing dist, accidentally-included secrets) in CI rather
+        # than at publish.
+        run: pnpm -r exec pnpm pack --dry-run
 
       - name: Unit tests
         # Run unit tests across ALL workspace packages (core + middleware-express).

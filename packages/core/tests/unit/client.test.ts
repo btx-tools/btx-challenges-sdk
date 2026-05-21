@@ -175,10 +175,9 @@ describe('BtxChallengeClient — error normalization', () => {
   it('maps non-2xx HTTP → BtxHttpError with redacted body (H2)', async () => {
     server.use(
       http.post(RPC_URL, () =>
-        HttpResponse.text(
-          'Authorization: basic dXNlcjpwYXNz\nrejected: bad creds',
-          { status: 401 },
-        ),
+        HttpResponse.text('Authorization: basic dXNlcjpwYXNz\nrejected: bad creds', {
+          status: 401,
+        }),
       ),
     );
     const client = makeClient();

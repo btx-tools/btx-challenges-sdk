@@ -18,11 +18,7 @@ export type DifficultyPolicy = 'fixed' | 'adaptive_window';
  * accepting arbitrary purpose strings. Don't "simplify" to plain `string` — it
  * loses the autocompletion benefit. See: https://github.com/microsoft/TypeScript/issues/29729
  */
-export type ChallengePurpose =
-  | 'rate_limit'
-  | 'api_gate'
-  | 'ai_inference_gate'
-  | (string & {});
+export type ChallengePurpose = 'rate_limit' | 'api_gate' | 'ai_inference_gate' | (string & {});
 
 /** Parameters for issuing a challenge via getmatmulservicechallenge. */
 export interface IssueParams {

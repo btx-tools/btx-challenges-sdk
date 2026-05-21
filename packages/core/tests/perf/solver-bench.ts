@@ -74,9 +74,7 @@ function fmtMs(ms: number): string {
 }
 
 const samples: number[] = [];
-console.log(
-  `pure-JS solver bench — n=${N}, b=${B}, r=${R}, attempts=${NUM_ATTEMPTS}`,
-);
+console.log(`pure-JS solver bench — n=${N}, b=${B}, r=${R}, attempts=${NUM_ATTEMPTS}`);
 console.log(`Node ${process.version} on ${process.platform}/${process.arch}`);
 console.log();
 

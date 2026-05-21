@@ -1,16 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { M31_MODULUS } from '../../../src/matmul/constants.js';
-import {
-  add,
-  dot,
-  fromOracle,
-  fromUint32,
-  inv,
-  mul,
-  neg,
-  sub,
-} from '../../../src/matmul/field.js';
+import { add, dot, fromOracle, fromUint32, inv, mul, neg, sub } from '../../../src/matmul/field.js';
 
 const MAX = M31_MODULUS - 1;
 

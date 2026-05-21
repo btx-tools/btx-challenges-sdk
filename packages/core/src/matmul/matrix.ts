@@ -51,9 +51,7 @@ export function fromSeedRect(seed: Uint8Array, rows: number, cols: number): Matr
  */
 export function matAdd(a: Matrix, b: Matrix): Matrix {
   if (a.rows !== b.rows || a.cols !== b.cols) {
-    throw new Error(
-      `matAdd: dim mismatch a=${a.rows}x${a.cols} b=${b.rows}x${b.cols}`,
-    );
+    throw new Error(`matAdd: dim mismatch a=${a.rows}x${a.cols} b=${b.rows}x${b.cols}`);
   }
   const out = zeros(a.rows, a.cols);
   for (let i = 0; i < a.data.length; i++) {
@@ -71,9 +69,7 @@ export function matAdd(a: Matrix, b: Matrix): Matrix {
  */
 export function matMul(a: Matrix, b: Matrix): Matrix {
   if (a.cols !== b.rows) {
-    throw new Error(
-      `matMul: inner-dim mismatch a.cols=${a.cols} b.rows=${b.rows}`,
-    );
+    throw new Error(`matMul: inner-dim mismatch a.cols=${a.cols} b.rows=${b.rows}`);
   }
   const out = zeros(a.rows, b.cols);
   const rowBuf = new Uint32Array(a.cols);
