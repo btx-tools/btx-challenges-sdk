@@ -6,6 +6,12 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ### @btx/challenges-sdk
 
+#### Day 2.5 Steps 11-13 — Day 2.5 close
+
+- **Integration tests** (`tests/integration/solve-redeem.test.ts`): added a parallel pure-JS suite alongside the existing RPC suite. Both stay triple-gated on `BTX_INTEGRATION_URL` + `BTX_INTEGRATION_AUTH` + `BTX_INTEGRATION_NODE_DEDICATED=1`. Pure-JS suite gets a 75-min timeout per test (n=512 at btxd's lowest difficulty ≈ 770 attempts × 4.6 s ≈ 1 hour expected).
+- **Perf bench** (`tests/perf/solver-bench.ts`): runnable via `npx tsx packages/core/tests/perf/solver-bench.ts [N]`. Walks the full canonical solve for N synthetic attempts at n=512 / b=16 / r=8 and reports mean/median/min/max. Day 2.5 baseline on M-series Mac / Node 22: **4.6 s/attempt** (mean over 5 samples, tight ±0.05 s spread).
+- **README**: updated `§ Solver` with a working pure-JS usage example (replaces the old "throws not_implemented" disclaimer), a § Algorithm correctness section listing the 5 byte-equal golden cross-checks, and a § Performance section with the bench numbers + per-difficulty wall-clock estimates. Roadmap now marks Day 2 + Day 2.5 ✅ and adds Day 2.6 (WASM port) as the next item.
+
 #### Day 2.5 Step 10 — cross-validation against btxd golden vectors (+ noise byte-order fix)
 
 - Cross-validated the pure-JS solver against pinned golden vectors lifted from btxd's own test suite (`src/test/matmul_*_tests.cpp`):
