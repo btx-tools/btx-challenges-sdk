@@ -6,6 +6,16 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 (no entries yet)
 
+## [middleware-express 0.1.0] - 2026-05-22
+
+First Express adapter for `@btx-tools/challenges-sdk`. See per-package CHANGELOG at `packages/middleware-express/CHANGELOG.md` for details.
+
+- `btxAdmission(opts)` factory returning an Express `RequestHandler`
+- Stateless echo-the-challenge flow (server never stores issued challenges)
+- 15 supertest-based unit tests, all green
+- CI workflow updated to run all workspace packages + reorder build-before-type-check (middleware deps on core's emitted .d.ts)
+- Peer deps: `express ^4 || ^5`, `@btx-tools/challenges-sdk ^0.0.1`
+
 ## [0.0.1] - 2026-05-22
 
 First npm publish under `@btx-tools/challenges-sdk`. Foundation release: RPC client + pure-JS solver + types. Spec days 1, 1.5, 2, 2.5 collapsed into this version.
