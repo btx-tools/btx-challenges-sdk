@@ -60,11 +60,12 @@ function makeClient() {
   return new BtxChallengeClient({
     rpcUrl: RPC_URL!,
     rpcAuth: { user: user ?? '', pass: pass ?? '' },
-    // 5 min — service-challenge solving on a mining-loaded node contends
-    // with block-template work. Day 1 telemetry showed matmul solver mean
-    // ~64s, max ~127s, on iowa. Generous timeout lets us actually witness
-    // a successful solve at least once during integration.
-    timeoutMs: 300_000,
+    // 15 min — service-challenge solving on iowa-class CPU-only mode at
+    // btxd's floor difficulty (target_solve_time_s=0.001 + min=0.001) needs
+    // ~770 expected attempts × ~600ms = ~7-10 min per solve. 5 min was
+    // empirically too tight; 0.0.2 integration runs measured ~7-8 min mean
+    // per solve. A dedicated CUDA-backed btxd would do this in seconds.
+    timeoutMs: 900_000,
   });
 }
 
@@ -79,8 +80,9 @@ describe.skipIf(SKIP_REASON !== null)(
         purpose: 'rate_limit',
         resource: 'sdk-test:/rpc/lifecycle',
         subject: 'tenant:rpc-e2e',
-        target_solve_time_s: 1,
-        expires_in_s: 120,
+        target_solve_time_s: 0.001,
+        min_solve_time_s: 0.001,
+        expires_in_s: 1800,
       });
       expect(challenge.challenge_id).toBeTruthy();
 
@@ -95,7 +97,7 @@ describe.skipIf(SKIP_REASON !== null)(
       expect(result.valid).toBe(true);
       expect(result.reason).toBe('ok');
       expect(result.redeemed).toBe(true);
-    }, 360_000);
+    }, 1_200_000);
 
     it('replay rejected (already_redeemed) on second redeem of the same proof', async () => {
       const client = makeClient();
@@ -103,8 +105,9 @@ describe.skipIf(SKIP_REASON !== null)(
         purpose: 'rate_limit',
         resource: 'sdk-test:/rpc/replay',
         subject: 'tenant:rpc-replay',
-        target_solve_time_s: 1,
-        expires_in_s: 120,
+        target_solve_time_s: 0.001,
+        min_solve_time_s: 0.001,
+        expires_in_s: 1800,
       });
       const proof = await Solver.solve(challenge, { mode: 'rpc', rpcClient: client });
 
@@ -114,7 +117,7 @@ describe.skipIf(SKIP_REASON !== null)(
       const second = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
       expect(second.valid).toBe(false);
       expect(second.reason).toBe('already_redeemed');
-    }, 360_000);
+    }, 1_200_000);
 
     it('Solver.solve mode:"auto" picks rpc when client provided', async () => {
       const client = makeClient();
@@ -122,12 +125,13 @@ describe.skipIf(SKIP_REASON !== null)(
         purpose: 'rate_limit',
         resource: 'sdk-test:/rpc/auto',
         subject: 'tenant:rpc-auto',
-        target_solve_time_s: 1,
-        expires_in_s: 120,
+        target_solve_time_s: 0.001,
+        min_solve_time_s: 0.001,
+        expires_in_s: 1800,
       });
       const proof = await Solver.solve(challenge, { rpcClient: client });
       expect(proof.nonce64_hex).toMatch(/^[0-9a-fA-F]+$/);
-    }, 360_000);
+    }, 1_200_000);
   },
 );
 
