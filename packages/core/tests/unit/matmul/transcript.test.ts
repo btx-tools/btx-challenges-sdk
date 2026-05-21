@@ -44,8 +44,12 @@ describe('matmul/transcript — deriveCompressionVector', () => {
   });
 
   it('rejects b <= 0', () => {
-    expect(() => deriveCompressionVector(sigma32(0x42), 0)).toThrow('block size b must be positive');
-    expect(() => deriveCompressionVector(sigma32(0x42), -1)).toThrow('block size b must be positive');
+    expect(() => deriveCompressionVector(sigma32(0x42), 0)).toThrow(
+      'block size b must be positive',
+    );
+    expect(() => deriveCompressionVector(sigma32(0x42), -1)).toThrow(
+      'block size b must be positive',
+    );
   });
 });
 
@@ -58,9 +62,7 @@ describe('matmul/transcript — compressBlock', () => {
   });
 
   it('rejects dim mismatch', () => {
-    expect(() => compressBlock(new Uint32Array(4), new Uint32Array(3))).toThrow(
-      'dim mismatch',
-    );
+    expect(() => compressBlock(new Uint32Array(4), new Uint32Array(3))).toThrow('dim mismatch');
   });
 });
 
@@ -105,16 +107,14 @@ describe('matmul/transcript — TranscriptHasher', () => {
 
   it('rejects wrong-sized c-block', () => {
     const h = new TranscriptHasher(sigma32(0x99), 2);
-    expect(() => h.addIntermediate(0, 0, 0, new Uint32Array(3))).toThrow(
-      'must be 4 elements',
-    );
+    expect(() => h.addIntermediate(0, 0, 0, new Uint32Array(3))).toThrow('must be 4 elements');
   });
 });
 
 describe('matmul/transcript — canonicalMatMul', () => {
   const sigma = sigma32(0xa5);
 
-  it('produces square C\' matching matMul on a 4×4 / b=2 case', () => {
+  it("produces square C' matching matMul on a 4×4 / b=2 case", () => {
     const aPrime = fromSeedRect(seed32(0x11), 4, 4);
     const bPrime = fromSeedRect(seed32(0x22), 4, 4);
 
@@ -130,7 +130,7 @@ describe('matmul/transcript — canonicalMatMul', () => {
     }
   });
 
-  it('produces square C\' matching matMul on an 8×8 / b=4 case', () => {
+  it("produces square C' matching matMul on an 8×8 / b=4 case", () => {
     const aPrime = fromSeedRect(seed32(0xab), 8, 8);
     const bPrime = fromSeedRect(seed32(0xcd), 8, 8);
     const result = canonicalMatMul(aPrime, bPrime, 4, sigma);
@@ -183,4 +183,36 @@ describe('matmul/transcript — canonicalMatMul', () => {
       'invalid transcript block size',
     );
   });
+
+  // Audit finding B-4 / F-3: pre-0.0.3 the only matmul cross-checks were at
+  // n=4, n=8. This sweep parameterizes across additional (n, b, r) shapes to
+  // guard against regressions on non-default dimensions. Each call must
+  // produce a deterministic 32-byte transcript_hash + a C' of shape n×n that
+  // equals naive matMul(A', B').
+  it.each([
+    { n: 16, b: 2, r: 1 },
+    { n: 16, b: 4, r: 2 },
+    { n: 16, b: 2, r: 4 },
+    { n: 32, b: 4, r: 2 },
+    { n: 32, b: 8, r: 4 },
+    { n: 64, b: 8, r: 4 },
+  ])(
+    "canonicalMatMul produces deterministic 32-byte transcript_hash + correct C' for (n=$n, b=$b, r=$r)",
+    ({ n, b }) => {
+      const aPrime = fromSeedRect(seed32(0x10 + n + b), n, n);
+      const bPrime = fromSeedRect(seed32(0x20 + n + b), n, n);
+
+      const result1 = canonicalMatMul(aPrime, bPrime, b, sigma);
+      const result2 = canonicalMatMul(aPrime, bPrime, b, sigma);
+
+      expect(result1.transcriptHash.length).toBe(32);
+      expect(result1.transcriptHash).toEqual(result2.transcriptHash);
+      expect(result1.cPrime.rows).toBe(n);
+      expect(result1.cPrime.cols).toBe(n);
+
+      // C' must equal naive matMul(A', B') element-wise
+      const reference = matMul(aPrime, bPrime);
+      expect([...result1.cPrime.data]).toEqual([...reference.data]);
+    },
+  );
 });

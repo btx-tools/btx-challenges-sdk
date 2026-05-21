@@ -6,6 +6,55 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 (no entries yet)
 
+## [0.0.3] - 2026-05-22
+
+Audit-resolution release. All non-breaking findings from the 2026-05-22 deep audit (`BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`) addressed at this version. Middleware breaking change ships as a parallel `middleware-express 0.2.0`.
+
+### @btx-tools/challenges-sdk
+
+- **G-1**: `package.json` declares `"sideEffects": false` so bundlers can tree-shake unused exports.
+- **A-3**: inline comment on `Math.random` fallback in `client.ts:66` documenting that it's NOT a security context (request-id correlation only).
+- **B-5**: new tests cover the nonce-overflow branch in `pow.ts` (start at `MAX_U64`, start at `MAX_U64 - 2n` with wraparound budget).
+- **B-6**: `attemptInterval` callback test parameterized across `[1, 2, 5, 10]`.
+- **B-4 / F-3**: parameterized `canonicalMatMul` sweep across (n=16,b=2,r=1), (n=16,b=4,r=2), (n=16,b=2,r=4), (n=32,b=4,r=2), (n=32,b=8,r=4), (n=64,b=8,r=4) — locks regression coverage on non-default matmul shapes.
+- Net unit test count: 130 → 142.
+
+## [middleware-express 0.2.0] - 2026-05-22 (BREAKING)
+
+⚠️ **Breaking change**: `Express.Request.btxResult` → `req.btx.result`. Migration:
+
+```diff
+- console.log(req.btxResult?.reason);
++ console.log(req.btx?.result.reason);
+```
+
+### Added
+
+- **D-1**: `BtxAdmissionOpts.onError?: (err: unknown, req: Request) => void` — observability hook fired once when `client.issue()` or `client.redeem()` throws, before `next(err)` runs. Includes 3 new unit tests (issue throws → fires; redeem throws → fires; 403 reject → does NOT fire).
+- **G-1**: `package.json` declares `"sideEffects": false`.
+- **C-2**: README API table now documents `isProofPresent`.
+- **A-5**: README has a new "Error handling" section recommending a custom Express error handler that doesn't leak server-side details.
+
+### Changed (breaking)
+
+- **C-3**: `req.btxResult: VerifyResult` → `req.btx: { result: VerifyResult }`. Reduces global `Express.Request` augmentation pollution and groups future BTX middleware state under a single namespace.
+
+### Migration
+
+Regex-replace across your codebase:
+
+| Before (0.1.x) | After (0.2.0) |
+|---|---|
+| `req.btxResult` | `req.btx?.result` |
+| `req.btxResult?.reason` | `req.btx?.result.reason` |
+| `req.btxResult!.redeemed` | `req.btx!.result.redeemed` |
+
+If you don't read `req.btxResult` in your handlers, no migration needed.
+
+### Tests
+
+15 → 18 unit tests (3 new for `onError` hook + namespace updates throughout).
+
 ## [0.0.2] - 2026-05-22
 
 Closes 2 of 3 deferred risks from `[0.0.1]`. Risk 6 (pure-JS proof-shape live roundtrip) stays open — closure deferred to 0.0.3.

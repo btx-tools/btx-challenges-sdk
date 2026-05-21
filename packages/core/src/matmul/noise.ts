@@ -13,12 +13,7 @@
 
 import { sha256 } from '@noble/hashes/sha2.js';
 
-import {
-  NOISE_TAG_EL,
-  NOISE_TAG_ER,
-  NOISE_TAG_FL,
-  NOISE_TAG_FR,
-} from './constants.js';
+import { NOISE_TAG_EL, NOISE_TAG_ER, NOISE_TAG_FL, NOISE_TAG_FR } from './constants.js';
 import { fromSeedRect, type Matrix } from './matrix.js';
 
 /** The 4 noise factor matrices. Sized (n×r, r×n, n×r, r×n) respectively. */

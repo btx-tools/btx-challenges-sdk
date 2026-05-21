@@ -10,15 +10,17 @@ const SOME_HASH_B = '22'.repeat(32);
 const SOME_HASH_C = '33'.repeat(32);
 
 /** Build a synthetic challenge envelope for testing. */
-function makeChallenge(overrides: {
-  n?: number;
-  b?: number;
-  r?: number;
-  target?: string;
-  nonce64_start?: number;
-  seed_a?: string;
-  seed_b?: string;
-} = {}): Challenge {
+function makeChallenge(
+  overrides: {
+    n?: number;
+    b?: number;
+    r?: number;
+    target?: string;
+    nonce64_start?: number;
+    seed_a?: string;
+    seed_b?: string;
+  } = {},
+): Challenge {
   return {
     challenge_id: 'test',
     issued_at: 0,
@@ -183,5 +185,45 @@ describe('matmul/pow — solveJs onAttempt callback', () => {
       onAttempt: (idx) => attempts.push(idx),
     });
     expect(attempts).toEqual([0, 2, 4]);
+  });
+
+  it.each([1, 2, 5, 10])(
+    'attemptInterval=%i fires the callback at the right indices',
+    (interval) => {
+      const attempts: number[] = [];
+      const N = 30;
+      solveJs(makeChallenge({ target: ZERO_HASH }), {
+        maxTries: N,
+        attemptInterval: interval,
+        onAttempt: (idx) => attempts.push(idx),
+      });
+      const expected = Array.from({ length: Math.ceil(N / interval) }, (_, i) => i * interval);
+      expect(attempts).toEqual(expected);
+    },
+  );
+});
+
+describe('matmul/pow — solveJs nonce overflow', () => {
+  // The Solve loop checks `if (nonce === MAX_U64) return null` to mirror
+  // btxd's `state.nonce == std::numeric_limits<uint64_t>::max() ? break`.
+  // Audit finding B-5: this branch was not test-covered.
+  it('returns null when starting at MAX_U64 with impossible target', () => {
+    const MAX_U64 = (1n << 64n) - 1n;
+    const result = solveJs(makeChallenge({ target: ZERO_HASH }), {
+      maxTries: 3,
+      nonceStart: MAX_U64,
+    });
+    // ZERO target = never solves. nonceStart=MAX_U64 → first attempt at MAX_U64,
+    // doesn't satisfy target, hits the overflow check, returns null.
+    expect(result).toBeNull();
+  });
+
+  it('returns null when wrapping past MAX_U64 within the maxTries window', () => {
+    const MAX_U64 = (1n << 64n) - 1n;
+    const result = solveJs(makeChallenge({ target: ZERO_HASH }), {
+      maxTries: 10,
+      nonceStart: MAX_U64 - 2n,
+    });
+    expect(result).toBeNull();
   });
 });

@@ -5,7 +5,7 @@
 
 Drop-in Express admission gate backed by [BTX](https://btx.dev) service challenges. Turns an Express route into a chain-anchored proof-of-work checkpoint with one line.
 
-> **Status**: 0.1.0 — first usable cut. Requires `@btx-tools/challenges-sdk@^0.0.1`.
+> **Status**: 0.2.0. Requires `@btx-tools/challenges-sdk@^0.0.1`. **Breaking change from 0.1.x**: `Express.Request.btxResult` was renamed to `req.btx.result` (see [CHANGELOG](./CHANGELOG.md#020---2026-05-22) for migration).
 
 ## Install
 
@@ -40,7 +40,7 @@ app.post(
     issueParams: { target_solve_time_s: 1.0, expires_in_s: 60 },
   }),
   async (req, res) => {
-    // req.btxResult is the redeem VerifyResult — proof of admission
+    // req.btx?.result is the redeem VerifyResult — proof of admission
     res.json({ ok: true, generated: '...' });
   },
 );
@@ -66,7 +66,7 @@ Client → POST /v1/generate
            X-BTX-Challenge:    <echoed challenge JSON>
            X-BTX-Proof-Nonce:  <hex>
            X-BTX-Proof-Digest: <hex>
-Server →   200 OK   (req.btxResult populated; your handler runs)
+Server →   200 OK   (req.btx?.result populated; your handler runs)
 ```
 
 Failure cases (server-side, all return JSON):
@@ -92,7 +92,8 @@ Returns a standard Express `RequestHandler`.
 | `subject` | `string \| (req) => string` | ✅ | Subject identifier — who's being challenged |
 | `issueParams` | `Partial<IssueParams>` | | Forwarded to `client.issue()` (e.g. `target_solve_time_s`, `expires_in_s`) |
 | `onAdmit` | `(req, result) => void` | | Hook fired on successful admission |
-| `isProofPresent` | `(req) => boolean` | | Override the default "all proof headers set?" check |
+| `onError` | `(err, req) => void` | | **New in 0.2.0** — hook fired exactly once when `client.issue()` or `client.redeem()` throws, before `next(err)` is invoked. Use for logging / observability; don't mutate the error |
+| `isProofPresent` | `(req) => boolean` | | Override the default "all 3 proof headers set?" check |
 
 ### Constants
 
@@ -107,13 +108,28 @@ import {
 
 ### Type augmentation
 
-The middleware augments `Express.Request` with `req.btxResult?: VerifyResult` so your handler can introspect the redemption outcome:
+The middleware augments `Express.Request` with `req.btx?: { result: VerifyResult }` so your handler can introspect the redemption outcome:
 
 ```typescript
 app.post('/v1/gate', btxAdmission({ ... }), (req, res) => {
-  console.log('admitted:', req.btxResult?.reason);  // 'ok' on success
+  console.log('admitted:', req.btx?.result.reason);  // 'ok' on success
 });
 ```
+
+> **Migration from 0.1.x**: rename `req.btxResult` → `req.btx?.result` in your handlers. The 0.1.x flat `btxResult` field polluted the global `Express.Request` type — the namespaced `btx` is scoped enough that it shouldn't collide with other middleware (audit finding C-3).
+
+### Error handling
+
+When `client.issue()` or `client.redeem()` throws, the middleware calls `next(err)` so Express's error pipeline handles it. **Be aware** that Express's default error handler in development mode includes the full stack trace in the HTTP response — a thrown `BtxRpcError` may carry server-internal details (btxd URL, RPC method names, response snippets) that you don't want exposed to clients. Configure a custom Express error handler that returns a sanitized response:
+
+```typescript
+app.use((err, req, res, next) => {
+  // Optional: also log via your APM here
+  res.status(500).json({ error: 'internal_error' });   // never err.message
+});
+```
+
+For observability without an error handler, use the `onError` hook in `BtxAdmissionOpts` (added 0.2.0).
 
 ## Deployment notes
 

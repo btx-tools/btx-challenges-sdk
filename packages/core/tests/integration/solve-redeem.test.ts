@@ -69,71 +69,68 @@ function makeClient() {
   });
 }
 
-describe.skipIf(SKIP_REASON !== null)(
-  'Solver end-to-end — RPC mode (btxd-delegated solve)',
-  () => {
-    it('issue → Solver.solve(mode:"rpc") → redeem succeeds', async () => {
-      const client = makeClient();
+describe.skipIf(SKIP_REASON !== null)('Solver end-to-end — RPC mode (btxd-delegated solve)', () => {
+  it('issue → Solver.solve(mode:"rpc") → redeem succeeds', async () => {
+    const client = makeClient();
 
-      // Step 1: issue
-      const challenge = await client.issue({
-        purpose: 'rate_limit',
-        resource: 'sdk-test:/rpc/lifecycle',
-        subject: 'tenant:rpc-e2e',
-        target_solve_time_s: 0.001,
-        min_solve_time_s: 0.001,
-        expires_in_s: 1800,
-      });
-      expect(challenge.challenge_id).toBeTruthy();
+    // Step 1: issue
+    const challenge = await client.issue({
+      purpose: 'rate_limit',
+      resource: 'sdk-test:/rpc/lifecycle',
+      subject: 'tenant:rpc-e2e',
+      target_solve_time_s: 0.001,
+      min_solve_time_s: 0.001,
+      expires_in_s: 1800,
+    });
+    expect(challenge.challenge_id).toBeTruthy();
 
-      // Step 2: solve (delegates to btxd)
-      const proof = await Solver.solve(challenge, { mode: 'rpc', rpcClient: client });
-      expect(proof.nonce64_hex).toMatch(/^[0-9a-fA-F]{16}$/);
-      expect(proof.digest_hex).toMatch(/^[0-9a-fA-F]{64}$/);
-      expect(proof.proof).toBeDefined();
+    // Step 2: solve (delegates to btxd)
+    const proof = await Solver.solve(challenge, { mode: 'rpc', rpcClient: client });
+    expect(proof.nonce64_hex).toMatch(/^[0-9a-fA-F]{16}$/);
+    expect(proof.digest_hex).toMatch(/^[0-9a-fA-F]{64}$/);
+    expect(proof.proof).toBeDefined();
 
-      // Step 3: redeem — the proof must be accepted by btxd
-      const result = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
-      expect(result.valid).toBe(true);
-      expect(result.reason).toBe('ok');
-      expect(result.redeemed).toBe(true);
-    }, 1_200_000);
+    // Step 3: redeem — the proof must be accepted by btxd
+    const result = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
+    expect(result.valid).toBe(true);
+    expect(result.reason).toBe('ok');
+    expect(result.redeemed).toBe(true);
+  }, 1_200_000);
 
-    it('replay rejected (already_redeemed) on second redeem of the same proof', async () => {
-      const client = makeClient();
-      const challenge = await client.issue({
-        purpose: 'rate_limit',
-        resource: 'sdk-test:/rpc/replay',
-        subject: 'tenant:rpc-replay',
-        target_solve_time_s: 0.001,
-        min_solve_time_s: 0.001,
-        expires_in_s: 1800,
-      });
-      const proof = await Solver.solve(challenge, { mode: 'rpc', rpcClient: client });
+  it('replay rejected (already_redeemed) on second redeem of the same proof', async () => {
+    const client = makeClient();
+    const challenge = await client.issue({
+      purpose: 'rate_limit',
+      resource: 'sdk-test:/rpc/replay',
+      subject: 'tenant:rpc-replay',
+      target_solve_time_s: 0.001,
+      min_solve_time_s: 0.001,
+      expires_in_s: 1800,
+    });
+    const proof = await Solver.solve(challenge, { mode: 'rpc', rpcClient: client });
 
-      const first = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
-      expect(first.valid).toBe(true);
+    const first = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
+    expect(first.valid).toBe(true);
 
-      const second = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
-      expect(second.valid).toBe(false);
-      expect(second.reason).toBe('already_redeemed');
-    }, 1_200_000);
+    const second = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
+    expect(second.valid).toBe(false);
+    expect(second.reason).toBe('already_redeemed');
+  }, 1_200_000);
 
-    it('Solver.solve mode:"auto" picks rpc when client provided', async () => {
-      const client = makeClient();
-      const challenge = await client.issue({
-        purpose: 'rate_limit',
-        resource: 'sdk-test:/rpc/auto',
-        subject: 'tenant:rpc-auto',
-        target_solve_time_s: 0.001,
-        min_solve_time_s: 0.001,
-        expires_in_s: 1800,
-      });
-      const proof = await Solver.solve(challenge, { rpcClient: client });
-      expect(proof.nonce64_hex).toMatch(/^[0-9a-fA-F]+$/);
-    }, 1_200_000);
-  },
-);
+  it('Solver.solve mode:"auto" picks rpc when client provided', async () => {
+    const client = makeClient();
+    const challenge = await client.issue({
+      purpose: 'rate_limit',
+      resource: 'sdk-test:/rpc/auto',
+      subject: 'tenant:rpc-auto',
+      target_solve_time_s: 0.001,
+      min_solve_time_s: 0.001,
+      expires_in_s: 1800,
+    });
+    const proof = await Solver.solve(challenge, { rpcClient: client });
+    expect(proof.nonce64_hex).toMatch(/^[0-9a-fA-F]+$/);
+  }, 1_200_000);
+});
 
 describe.skipIf(SKIP_REASON !== null)(
   'Solver end-to-end — pure-JS mode (browser-compatible, no RPC solve)',
@@ -145,76 +142,88 @@ describe.skipIf(SKIP_REASON !== null)(
     // These tests get a 75-min timeout to absorb the right tail.
     const PURE_JS_TIMEOUT_MS = 75 * 60 * 1000;
 
-    it('issue → Solver.solve(mode:"pure-js") → redeem succeeds', async () => {
-      const client = makeClient();
+    it(
+      'issue → Solver.solve(mode:"pure-js") → redeem succeeds',
+      async () => {
+        const client = makeClient();
 
-      const challenge = await client.issue({
-        purpose: 'rate_limit',
-        resource: 'sdk-test:/pure-js/lifecycle',
-        subject: 'tenant:pure-js-e2e',
-        target_solve_time_s: 0.001,
-        min_solve_time_s: 0.001,
-        expires_in_s: 7200,
-      });
-      expect(challenge.challenge_id).toBeTruthy();
+        const challenge = await client.issue({
+          purpose: 'rate_limit',
+          resource: 'sdk-test:/pure-js/lifecycle',
+          subject: 'tenant:pure-js-e2e',
+          target_solve_time_s: 0.001,
+          min_solve_time_s: 0.001,
+          expires_in_s: 7200,
+        });
+        expect(challenge.challenge_id).toBeTruthy();
 
-      const proof = await Solver.solve(challenge, {
-        mode: 'pure-js',
-        pureJs: { maxTries: 5000 },
-      });
-      expect(proof.nonce64_hex).toMatch(/^[0-9a-fA-F]{16}$/);
-      expect(proof.digest_hex).toMatch(/^[0-9a-fA-F]{64}$/);
-      expect(proof.proof).toMatchObject({
-        challenge,
-        nonce64_hex: proof.nonce64_hex,
-        digest_hex: proof.digest_hex,
-      });
+        const proof = await Solver.solve(challenge, {
+          mode: 'pure-js',
+          pureJs: { maxTries: 5000 },
+        });
+        expect(proof.nonce64_hex).toMatch(/^[0-9a-fA-F]{16}$/);
+        expect(proof.digest_hex).toMatch(/^[0-9a-fA-F]{64}$/);
+        expect(proof.proof).toMatchObject({
+          challenge,
+          nonce64_hex: proof.nonce64_hex,
+          digest_hex: proof.digest_hex,
+        });
 
-      const result = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
-      expect(result.valid).toBe(true);
-      expect(result.reason).toBe('ok');
-      expect(result.redeemed).toBe(true);
-    }, PURE_JS_TIMEOUT_MS);
+        const result = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
+        expect(result.valid).toBe(true);
+        expect(result.reason).toBe('ok');
+        expect(result.redeemed).toBe(true);
+      },
+      PURE_JS_TIMEOUT_MS,
+    );
 
-    it('replay rejected on second redeem of a pure-JS-generated proof', async () => {
-      const client = makeClient();
-      const challenge = await client.issue({
-        purpose: 'rate_limit',
-        resource: 'sdk-test:/pure-js/replay',
-        subject: 'tenant:pure-js-replay',
-        target_solve_time_s: 0.001,
-        min_solve_time_s: 0.001,
-        expires_in_s: 7200,
-      });
-      const proof = await Solver.solve(challenge, {
-        mode: 'pure-js',
-        pureJs: { maxTries: 5000 },
-      });
+    it(
+      'replay rejected on second redeem of a pure-JS-generated proof',
+      async () => {
+        const client = makeClient();
+        const challenge = await client.issue({
+          purpose: 'rate_limit',
+          resource: 'sdk-test:/pure-js/replay',
+          subject: 'tenant:pure-js-replay',
+          target_solve_time_s: 0.001,
+          min_solve_time_s: 0.001,
+          expires_in_s: 7200,
+        });
+        const proof = await Solver.solve(challenge, {
+          mode: 'pure-js',
+          pureJs: { maxTries: 5000 },
+        });
 
-      const first = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
-      expect(first.valid).toBe(true);
+        const first = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
+        expect(first.valid).toBe(true);
 
-      const second = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
-      expect(second.valid).toBe(false);
-      expect(second.reason).toBe('already_redeemed');
-    }, PURE_JS_TIMEOUT_MS);
+        const second = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
+        expect(second.valid).toBe(false);
+        expect(second.reason).toBe('already_redeemed');
+      },
+      PURE_JS_TIMEOUT_MS,
+    );
 
-    it('Solver.solve mode:"auto" falls back to pure-js when no rpcClient', async () => {
-      const client = makeClient();
-      const challenge = await client.issue({
-        purpose: 'rate_limit',
-        resource: 'sdk-test:/pure-js/auto',
-        subject: 'tenant:pure-js-auto',
-        target_solve_time_s: 0.001,
-        min_solve_time_s: 0.001,
-        expires_in_s: 7200,
-      });
-      // Note: no rpcClient → auto picks pure-js
-      const proof = await Solver.solve(challenge, { pureJs: { maxTries: 5000 } });
-      expect(proof.nonce64_hex).toMatch(/^[0-9a-fA-F]{16}$/);
+    it(
+      'Solver.solve mode:"auto" falls back to pure-js when no rpcClient',
+      async () => {
+        const client = makeClient();
+        const challenge = await client.issue({
+          purpose: 'rate_limit',
+          resource: 'sdk-test:/pure-js/auto',
+          subject: 'tenant:pure-js-auto',
+          target_solve_time_s: 0.001,
+          min_solve_time_s: 0.001,
+          expires_in_s: 7200,
+        });
+        // Note: no rpcClient → auto picks pure-js
+        const proof = await Solver.solve(challenge, { pureJs: { maxTries: 5000 } });
+        expect(proof.nonce64_hex).toMatch(/^[0-9a-fA-F]{16}$/);
 
-      const result = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
-      expect(result.valid).toBe(true);
-    }, PURE_JS_TIMEOUT_MS);
+        const result = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
+        expect(result.valid).toBe(true);
+      },
+      PURE_JS_TIMEOUT_MS,
+    );
   },
 );

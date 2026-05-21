@@ -58,8 +58,7 @@ export function solveJs(challenge: Challenge, options: SolveJsOptions = {}): Sol
   const { n, b, r } = payload.matmul;
 
   const maxTries = options.maxTries ?? 1_000_000;
-  const nonceStart =
-    options.nonceStart ?? BigInt(ctx.nonce64_start ?? 0);
+  const nonceStart = options.nonceStart ?? BigInt(ctx.nonce64_start ?? 0);
   const attemptInterval = options.attemptInterval ?? 1;
 
   if (n <= 0 || b <= 0 || r <= 0) {
