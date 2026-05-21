@@ -6,7 +6,22 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ### @btx/challenges-sdk
 
-#### Day 2.5 — pure-JS MatMul solver (algorithm port complete; cross-validation pending)
+#### Day 2.5 Step 10 — cross-validation against btxd golden vectors (+ noise byte-order fix)
+
+- Cross-validated the pure-JS solver against pinned golden vectors lifted from btxd's own test suite (`src/test/matmul_*_tests.cpp`):
+  - `matrix.fromSeedRect(zero, 8)` first 3 elements match `matrix_from_seed_deterministic`
+  - `deriveNoiseSeed(TAG_EL, zero_sigma)` matches `noise_derived_seed_pinned_EL`
+  - `noise.generate(zero_sigma, 4, 2)` E_L + E_R matrices match `noise_EL_pinned_elements` / `noise_ER_pinned_elements`
+  - `canonicalMatMul(A=FromSeed(seed_a,8), B=FromSeed(seed_b,8), b=4, sigma)` transcript_hash matches `canonical_matmul_n8_b4_pinned_transcript`
+- Plus a live sigma cross-check against btx-iowa's `verifymatmulserviceproof` for two nonces — byte-equal.
+- New test file: `packages/core/tests/unit/matmul/btxd-vectors.test.ts` (5 tests) — locks the cross-validation in CI so a future port change can't silently break it.
+
+##### Fixed (algorithm correctness)
+
+- **Noise + compression seed byte-order**: `deriveNoiseSeed` (noise.ts) and `deriveCompressionSeed` (transcript.ts) were reversing the raw SHA-256 output before returning. Cause: btxd's C++ stores these uint256s via `CanonicalBytesToUint256` (reverse-storage), while `DeriveSigma` stores its uint256 direct — asymmetric storage that doesn't translate to a single "BE convention" in TS. `from_oracle`'s internal reverse-then-hash inverts each storage policy differently, so the bytes ACTUALLY HASHED end up: `REVERSE(raw_sigma)` for sigma, but `raw_noise` for noise/compression. The TS port was applying the same reverse to both. Fix: remove the reverse on the output of `deriveNoiseSeed` and `deriveCompressionSeed`; keep the reverse on `deriveSigma`. All 130 unit tests still green.
+- Without this fix, every noise matrix entry and every compression-vector element was wrong, producing digests btxd would reject. Caught by the cross-validation script before any external user noticed.
+
+#### Day 2.5 Steps 1-9 — pure-JS MatMul solver port (algorithm port complete; cross-validation pending)
 
 - `Solver.solve(challenge, { mode: 'pure-js' })` now produces real proofs instead of throwing `not_implemented`. Browser-compatible, no btxd RPC required.
 - Port of the canonical CPU path from `btxd v0.29.7 src/matmul/` (`field`, `noise`, `transcript`, `matmul_pow` — NEON/CUDA acceleration paths intentionally out of scope):

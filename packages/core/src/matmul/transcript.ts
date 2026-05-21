@@ -23,17 +23,19 @@ import { zeros, type Matrix } from './matrix.js';
 
 /**
  * Per-sigma compression seed. Mirrors `DeriveCompressionSeed` in transcript.cpp
- * (the anonymous-namespace helper). Returns 32 bytes in BE/display order so
- * it can flow into {@link fromOracle} directly.
+ * (the anonymous-namespace helper).
+ *
+ * Like `deriveNoiseSeed`, btxd stores this via `CanonicalBytesToUint256` —
+ * the LE storage is the reverse of the raw digest. `from_oracle` reverses
+ * once more before hashing, so the bytes actually fed to the per-index
+ * SHA-256 are the RAW digest. Our `fromOracle` hashes the seed directly,
+ * so we return the raw digest with no extra reverse.
  */
 function deriveCompressionSeed(sigmaBE: Uint8Array): Uint8Array {
   const hasher = sha256.create();
   hasher.update(new TextEncoder().encode(TRANSCRIPT_COMPRESS_TAG));
   hasher.update(sigmaBE);
-  const digest = hasher.digest();
-  const seedBE = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) seedBE[i] = digest[31 - i]!;
-  return seedBE;
+  return hasher.digest();
 }
 
 /**
