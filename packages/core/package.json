@@ -1,5 +1,5 @@
 {
-  "name": "@btx/challenges-sdk",
+  "name": "@btx-tools/challenges-sdk",
   "version": "0.0.1",
   "description": "TypeScript SDK for BTX service challenges — chain-anchored proof-of-work admission control for APIs, agent gateways, and form submissions",
   "author": "visitor-code <visitor@friction.market>",
@@ -23,8 +23,7 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE",
-    "CHANGELOG.md"
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",
@@ -59,17 +58,20 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/visitor-code/btx-challenges-sdk.git",
+    "url": "git+https://github.com/btx-tools/btx-challenges-sdk.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/visitor-code/btx-challenges-sdk/tree/main/packages/core#readme",
+  "homepage": "https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/core#readme",
   "bugs": {
-    "url": "https://github.com/visitor-code/btx-challenges-sdk/issues"
+    "url": "https://github.com/btx-tools/btx-challenges-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=18.17"
   },
   "dependencies": {
-    "@noble/hashes": "^2.2.0"
+    "@noble/hashes": "~2.2.0"
   }
 }

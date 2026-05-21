@@ -4,7 +4,19 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
-### @btx/challenges-sdk
+(no entries yet)
+
+## [0.0.1] - 2026-05-22
+
+First npm publish under `@btx-tools/challenges-sdk`. Foundation release: RPC client + pure-JS solver + types. Spec days 1, 1.5, 2, 2.5 collapsed into this version.
+
+### Known limitations (deferred to 0.0.2)
+
+- **Live HTTP-loop integration tests** (`tests/integration/solve-redeem.test.ts`) are present and gated on `BTX_INTEGRATION_URL/AUTH/NODE_DEDICATED`, but have NOT been run end-to-end against a live dedicated btxd before this release. Algorithm correctness is instead validated via 5 byte-equal golden vectors lifted from btxd's own test suite (`tests/unit/matmul/btxd-vectors.test.ts`) + a live sigma cross-check against btx-iowa. HTTP + auth paths are exercised by 14 msw-mocked unit tests + the Day 1 smoke test. The live HTTP-loop run is queued for 0.0.2 once a dedicated non-mining btxd is provisioned.
+- **Proof-shape live roundtrip**: `SolverOutput.proof = { challenge, nonce64_hex, digest_hex }` is derived by reading btxd's `solvematmulservicechallenge` RPC handler. Structure is verified statically; live roundtrip (pure-JS solve → `client.redeem` → `valid: true`) closes alongside the integration test run.
+- **Pure-JS performance** is V8-specific (measured 4.6 s/attempt at n=512 on Node 22 / M-series Mac). Bun, Deno, Firefox, Safari untested.
+
+### @btx-tools/challenges-sdk
 
 #### Day 2.5 Steps 11-13 — Day 2.5 close
 
@@ -92,7 +104,7 @@ btxd's `solvematmulservicechallenge` RPC shares matmul backend with block mining
 
 - **M4** (functional companion for tree-shaking) → v0.1 work
 
-### @btx/mcp-gateway
+### @btx-tools/mcp-gateway
 
 - Scaffold only (Day 1) — real implementation Day 5-6
 

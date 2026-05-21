@@ -4,7 +4,7 @@
 
 TypeScript SDK for **BTX service challenges** — chain-anchored proof-of-work admission control for APIs, agent gateways, and form submissions.
 
-> ⚠️ **Status**: 0.0.1 pre-release. Day 2.5 shipped: RPC + pure-JS solver, cross-validated byte-equal against btxd's own pinned test vectors. See [CHANGELOG](../../CHANGELOG.md).
+> ⚠️ **Status**: 0.0.1 pre-release. Day 2.5 shipped: RPC + pure-JS solver, cross-validated byte-equal against btxd's own pinned test vectors. See [CHANGELOG](https://github.com/btx-tools/btx-challenges-sdk/blob/main/CHANGELOG.md).
 
 ## What is this?
 
@@ -179,6 +179,8 @@ Reproduce the bench:
 ```bash
 npx tsx packages/core/tests/perf/solver-bench.ts 10   # 10 attempts
 ```
+
+> **Cross-engine note**: bench captured on **Node 22 / V8 / M-series Mac arm64** (2026-05-21). `bigint` performance varies significantly by JS engine — Bun, Deno, Firefox SpiderMonkey, Safari JavaScriptCore are untested. If you run the SDK in those environments, please file an issue with your `solver-bench.ts` output so we can track real-world numbers across engines.
 
 ## Roadmap
 
