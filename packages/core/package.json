@@ -68,5 +68,8 @@
   },
   "engines": {
     "node": ">=18.17"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.2.0"
   }
 }

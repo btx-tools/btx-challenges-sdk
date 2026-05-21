@@ -93,6 +93,35 @@ const stubSolverOutput: SolverOutput = {
   proof: { ok: true },
 };
 
+/**
+ * A valid-hex challenge usable by the pure-JS solver. Uses tiny matrix dims
+ * (n=4, b=2, r=1) and a maximally-lax target so the solver completes in
+ * roughly one attempt.
+ */
+const pureJsChallenge: Challenge = {
+  ...stubChallenge,
+  challenge: {
+    ...stubChallenge.challenge,
+    target: 'ff'.repeat(32),
+    header_context: {
+      ...stubChallenge.challenge.header_context,
+      previousblockhash: '11'.repeat(32),
+      merkleroot: '22'.repeat(32),
+      matmul_dim: 4,
+      seed_a: '33'.repeat(32),
+      seed_b: '44'.repeat(32),
+    },
+    matmul: {
+      ...stubChallenge.challenge.matmul,
+      n: 4,
+      b: 2,
+      r: 1,
+      seed_a: '33'.repeat(32),
+      seed_b: '44'.repeat(32),
+    },
+  },
+};
+
 /** Install an RPC handler that returns `stubSolverOutput` for solvematmulservicechallenge. */
 function mockSolvematmulRpc(): void {
   server.use(
@@ -159,21 +188,40 @@ describe('Solver.solve — mode dispatch (Day 2 RPC-only)', () => {
     });
   });
 
-  describe('mode: "pure-js" (Day 2.5)', () => {
-    it('throws not-implemented with helpful message', async () => {
-      await expect(Solver.solve(stubChallenge, { mode: 'pure-js' })).rejects.toThrow(
-        /not yet implemented/i,
-      );
+  describe('mode: "pure-js"', () => {
+    it('returns a SolverOutput on a trivially-solvable challenge', async () => {
+      const out = await Solver.solve(pureJsChallenge, { mode: 'pure-js' });
+      expect(out.nonce64_hex).toHaveLength(16);
+      expect(out.digest_hex).toHaveLength(64);
+      expect(out.proof).toMatchObject({
+        challenge: pureJsChallenge,
+        nonce64_hex: out.nonce64_hex,
+        digest_hex: out.digest_hex,
+      });
     });
 
-    it('hints at the rpc fallback', async () => {
-      try {
-        await Solver.solve(stubChallenge, { mode: 'pure-js' });
-        expect.fail('should have thrown');
-      } catch (err) {
-        const msg = (err as Error).message;
-        expect(msg).toMatch(/mode="rpc"/);
-      }
+    it('forwards pureJs options (maxTries) to the solver', async () => {
+      // target=0 + maxTries=2 → exhausts without finding a proof
+      const impossible: Challenge = {
+        ...pureJsChallenge,
+        challenge: {
+          ...pureJsChallenge.challenge,
+          target: '00'.repeat(32),
+        },
+      };
+      await expect(
+        Solver.solve(impossible, { mode: 'pure-js', pureJs: { maxTries: 2 } }),
+      ).rejects.toThrow(/exhausted maxTries=2/);
+    });
+
+    it('propagates malformed-challenge errors', async () => {
+      const bad: Challenge = {
+        ...pureJsChallenge,
+        challenge: { ...pureJsChallenge.challenge, target: 'nothex' },
+      };
+      await expect(Solver.solve(bad, { mode: 'pure-js' })).rejects.toThrow(
+        /expected 64 hex chars/,
+      );
     });
   });
 
@@ -184,10 +232,9 @@ describe('Solver.solve — mode dispatch (Day 2 RPC-only)', () => {
       expect(out).toEqual(stubSolverOutput);
     });
 
-    it('falls back to pure-js (throws today) when no rpcClient', async () => {
-      await expect(Solver.solve(stubChallenge, { mode: 'auto' })).rejects.toThrow(
-        /not yet implemented/i,
-      );
+    it('falls back to pure-js when no rpcClient', async () => {
+      const out = await Solver.solve(pureJsChallenge, { mode: 'auto' });
+      expect(out.nonce64_hex).toHaveLength(16);
     });
 
     it('is the default when opts.mode is omitted', async () => {
@@ -196,8 +243,9 @@ describe('Solver.solve — mode dispatch (Day 2 RPC-only)', () => {
       expect(out).toEqual(stubSolverOutput);
     });
 
-    it('is the default with empty options object', async () => {
-      await expect(Solver.solve(stubChallenge)).rejects.toThrow(/not yet implemented/i);
+    it('is the default with empty options object (falls back to pure-js)', async () => {
+      const out = await Solver.solve(pureJsChallenge);
+      expect(out.nonce64_hex).toHaveLength(16);
     });
   });
 });
