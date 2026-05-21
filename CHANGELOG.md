@@ -6,6 +6,27 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ### @btx/challenges-sdk
 
+#### Day 2.5 — pure-JS MatMul solver (algorithm port complete; cross-validation pending)
+
+- `Solver.solve(challenge, { mode: 'pure-js' })` now produces real proofs instead of throwing `not_implemented`. Browser-compatible, no btxd RPC required.
+- Port of the canonical CPU path from `btxd v0.29.7 src/matmul/` (`field`, `noise`, `transcript`, `matmul_pow` — NEON/CUDA acceleration paths intentionally out of scope):
+  - `src/matmul/constants.ts` — M31 modulus + 6 domain tags (4 noise, 2 transcript)
+  - `src/matmul/field.ts` — M31 arithmetic (`add/sub/mul/neg/inv/dot/fromOracle`). `mul` and `dot` accumulator use `BigInt` because the worst-case product 2^62 exceeds Number's 2^53 precision; a Number-only split-multiplication path is queued as a perf optimization
+  - `src/matmul/matrix.ts` — Matrix struct + `zeros/get/set/fromSeedRect/matAdd/matMul`
+  - `src/matmul/header.ts` — `serializeMatMulHeader/computeMatMulHeaderHash/deriveSigma` matching btxd's 150-byte LE wire format
+  - `src/matmul/noise.ts` — `deriveNoiseSeed/generate` → `NoisePair {E_L, E_R, F_L, F_R}`
+  - `src/matmul/transcript.ts` — `deriveCompressionVector/compressBlock/TranscriptHasher/canonicalMatMul` (block-wise n×n product with SHA-256d transcript binding)
+  - `src/matmul/pow.ts` — top-level `solveJs(challenge, options)` nonce search loop with `bigint` 256-bit target comparison
+- `SolverOptions.pureJs?: SolveJsOptions` forwards `{ maxTries, nonceStart, onAttempt, attemptInterval }` to the pure-JS solver
+- `SolverOutput.proof` populated with the same shape btxd's solve RPC returns: `{ challenge, nonce64_hex, digest_hex }`
+- Adds `@noble/hashes ^2.2.0` runtime dep (~25 KB, zero sub-deps, audited)
+- 100 new unit tests for the matmul submodules (field 22, header 14, matrix 13, noise 11, transcript 21, pow 15, constants 4). Existing solver dispatch tests updated for the new pure-js behavior; RPC tests untouched
+- Build size delta: ESM 7.84 KB → 22.65 KB (well under the +30 KB budget)
+
+**Internal correctness verified**: `canonicalMatMul`'s C' matches naive `matMul` on 4×4 / 8×8 cases; SHA-256d transcript is deterministic across instances; field invariants hold (a·inv(a)=1, MAX²=1, oracle determinism). **Cross-validation against btxd's actual digests still pending** — requires fixtures captured from a dedicated non-mining btxd. Until that lands, `Solver.solve({ mode: 'pure-js' })` outputs may or may not redeem against a live btxd. Documented as a known constraint in the SDK; the gate is Day 2.5 Step 10.
+
+**Out of scope** (queued for Day 2.6+): WASM port of the matmul kernel, Web Worker parallel nonce search, replay/product-committed digest helpers (verifier optimizations), perf bench against M-series Mac.
+
 #### Day 2 — Solver class (RPC mode)
 
 - `Solver` class with mode dispatch (`'rpc' | 'pure-js' | 'auto'`)
