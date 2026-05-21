@@ -29,11 +29,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build
+        # Must run BEFORE type-check so workspace packages
+        # (e.g. middleware-express) can resolve @btx-tools/challenges-sdk
+        # types from core's dist/ output.
+        run: pnpm -r build
+
       - name: Type-check
         run: pnpm -r type-check
-
-      - name: Build
-        run: pnpm -r build
 
       - name: Unit tests
         # Run unit tests across ALL workspace packages (core + middleware-express).
