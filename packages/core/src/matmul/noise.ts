@@ -31,11 +31,18 @@ export interface NoisePair {
 
 /**
  * Per-tag seed derivation. Matches `btxd noise::DeriveNoiseSeed`:
- *   seed = REVERSE(SHA-256(domain_tag || REVERSE(sigma_LE)))
+ *   seed = SHA-256(domain_tag || sigma_BE)
  *
- * In our BE-internal convention, sigma is already in BE order so the
- * "reverse sigma" step is a no-op; we just need to reverse the final
- * SHA-256 output back to BE so it flows naturally into `fromOracle`.
+ * Subtle byte-order point: btxd stores the noise seed via
+ * `CanonicalBytesToUint256(digest)` — i.e. the uint256's LE storage is the
+ * REVERSE of the raw SHA-256 output. Then `from_oracle` reverses that LE
+ * storage again before hashing, so the bytes actually fed to the per-index
+ * SHA-256 are the RAW digest. Our `fromOracle` hashes the seed directly
+ * (no internal reverse), so we must return the raw digest here — no reverse.
+ *
+ * (Contrast with `deriveSigma`, which DOES reverse: btxd's sigma uint256 is
+ * stored direct from the SHA-256 output, so `from_oracle`'s reverse lands on
+ * REVERSE(raw). The reverse in our `deriveSigma` mirrors that asymmetry.)
  */
 export function deriveNoiseSeed(domainTag: string, sigmaBE: Uint8Array): Uint8Array {
   if (sigmaBE.length !== 32) {
@@ -48,11 +55,7 @@ export function deriveNoiseSeed(domainTag: string, sigmaBE: Uint8Array): Uint8Ar
   const hasher = sha256.create();
   hasher.update(new TextEncoder().encode(domainTag));
   hasher.update(sigmaBE);
-  const digest = hasher.digest();
-  // digest is "LE storage" per btxd's uint256 view; reverse to BE for downstream.
-  const seedBE = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) seedBE[i] = digest[31 - i]!;
-  return seedBE;
+  return hasher.digest();
 }
 
 /**
