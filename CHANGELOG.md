@@ -6,6 +6,23 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 (no entries yet)
 
+## [0.0.2] - 2026-05-22
+
+Closes 2 of 3 deferred risks from `[0.0.1]`. Risk 6 (pure-JS proof-shape live roundtrip) stays open — closure deferred to 0.0.3.
+
+### Verified live
+
+- **Risk 1 closed**: `tests/integration/solve-redeem.test.ts` RPC-mode lifecycle test ran end-to-end against a live btxd (issue → `Solver.solve({ mode: 'rpc' })` → `client.redeem` → `result.valid: true`). Full HTTP/JSON-RPC contract + Basic auth + redeem path now empirically validated, not just msw-mocked.
+- **Risk 2 closed**: cross-engine perf bench captured for Node 22 / V8 (4.6 s/attempt — baseline), Deno 2.7 / V8 (4.2 s/attempt — within noise), Bun 1.3 / JavaScriptCore (9.8 s/attempt — **2.1× slower than V8** for BigInt-heavy M31 arithmetic). README § Performance updated with a cross-engine table + per-engine expected solve times at floor difficulty.
+
+### Still deferred
+
+- **Risk 6**: live roundtrip of a pure-JS-generated proof through `client.redeem` (~1 hr Mac wall-clock per attempt; deferred to 0.0.3). Algorithm correctness is already locked at unit level via 5 byte-equal golden vectors lifted from btxd's own test suite; the live roundtrip would prove the proof field shape we derived from btxd's source is also accepted by the live verifier.
+
+### Test infrastructure changes
+
+- RPC suite tests now use `target_solve_time_s: 0.001 + min_solve_time_s: 0.001` (btxd's floor difficulty) instead of `target_solve_time_s: 1` — keeps CPU-only CPU-only solve under ~10 min for the test pause window. `expires_in_s: 120 → 1800` so the challenge doesn't expire during slow solves. Per-test timeout 360s → 1_200_000ms. Client timeout 300_000ms → 900_000ms with comment.
+
 ## [middleware-express 0.1.0] - 2026-05-22
 
 First Express adapter for `@btx-tools/challenges-sdk`. See per-package CHANGELOG at `packages/middleware-express/CHANGELOG.md` for details.

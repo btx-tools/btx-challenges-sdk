@@ -156,17 +156,27 @@ For RPC mode at advertised latency (~1–4 seconds), point it at a **dedicated b
 
 ## Performance
 
-Pure-JS solver bench at production matmul shape (n=512, b=16, r=8) on M-series Mac / Node 22 (2026-05-21):
+Pure-JS solver bench at production matmul shape (n=512, b=16, r=8) on M-series Mac arm64 (2026-05-22, 5-sample mean):
 
-| Statistic | Wall-clock per attempt |
+| Engine | Mean / attempt | vs Node 22 |
+|---|---|---|
+| **Node 22.20 / V8** | **4.6 s** | 1.0× (baseline) |
+| Deno 2.7 / V8 | 4.2 s | 0.92× (slightly faster, within noise) |
+| Bun 1.3 / JavaScriptCore | 9.8 s | **2.1× slower** |
+| Firefox SpiderMonkey | untested | — |
+| Safari JavaScriptCore | untested | — |
+
+`mul` and the `dot` accumulator use `bigint` because the worst-case M31 product (`(2^31-1)^2 ≈ 2^62`) exceeds `Number`'s 2^53 precision. The `bigint`-bounded inner loop is the dominant cost. **Bun's JavaScriptCore engine is ~2× slower than V8 for `bigint`-heavy workloads** — if Bun is your runtime, factor that into your `target_solve_time_s` calibration.
+
+Expected end-to-end solve time depends on challenge difficulty. At btxd's lowest service-challenge difficulty (`target_solve_time_s = min_solve_time_s = 0.001`), per-attempt success ≈ 1.3·10⁻³, so expected ≈ 770 attempts:
+
+| Engine | Expected solve at floor difficulty |
 |---|---|
-| mean | **4.6 s** |
-| median | 4.6 s |
-| min / max | 4.6 / 4.7 s |
+| Node 22 / V8 | ~59 min |
+| Deno 2.7 / V8 | ~54 min |
+| Bun 1.3 / JSC | ~2.1 hr |
 
-`mul` and the `dot` accumulator use `bigint` because the worst-case M31 product (`(2^31-1)^2 ≈ 2^62`) exceeds `Number`'s 2^53 precision. The `bigint`-bounded inner loop is the dominant cost.
-
-Expected end-to-end solve time depends on challenge difficulty. At btxd's lowest service-challenge difficulty (`target_solve_time_s = min_solve_time_s = 0.001`), per-attempt success ≈ 1.3·10⁻³, so expected ≈ 770 attempts ≈ **1 hour** wall-clock. **Default difficulty is too slow for online browser use.** Workable today for:
+**Default difficulty is too slow for online browser use.** Workable today for:
 
 - Server-side gating where you control difficulty (calibrate via `target_solve_time_s` for your target user wait)
 - Backend cron / batch jobs
@@ -177,10 +187,10 @@ Day 2.6 will add a WASM port of the matmul kernel + the `field.mul`/`field.dot` 
 Reproduce the bench:
 
 ```bash
-npx tsx packages/core/tests/perf/solver-bench.ts 10   # 10 attempts
+npx tsx packages/core/tests/perf/solver-bench.ts 10                              # Node
+deno run --allow-all --unstable-sloppy-imports tests/perf/solver-bench.ts 10     # Deno
+bun tests/perf/solver-bench.ts 10                                                # Bun
 ```
-
-> **Cross-engine note**: bench captured on **Node 22 / V8 / M-series Mac arm64** (2026-05-21). `bigint` performance varies significantly by JS engine — Bun, Deno, Firefox SpiderMonkey, Safari JavaScriptCore are untested. If you run the SDK in those environments, please file an issue with your `solver-bench.ts` output so we can track real-world numbers across engines.
 
 ## Drop-in middleware
 
