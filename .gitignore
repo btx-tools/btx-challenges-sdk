@@ -10,3 +10,4 @@ coverage/
 .vitest/
 .cache/
 .turbo/
+*.tgz
