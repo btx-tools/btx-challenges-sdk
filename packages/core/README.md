@@ -182,6 +182,38 @@ npx tsx packages/core/tests/perf/solver-bench.ts 10   # 10 attempts
 
 > **Cross-engine note**: bench captured on **Node 22 / V8 / M-series Mac arm64** (2026-05-21). `bigint` performance varies significantly by JS engine — Bun, Deno, Firefox SpiderMonkey, Safari JavaScriptCore are untested. If you run the SDK in those environments, please file an issue with your `solver-bench.ts` output so we can track real-world numbers across engines.
 
+## Drop-in middleware
+
+For Express apps, install the companion package:
+
+```bash
+npm install @btx-tools/middleware-express
+```
+
+```typescript
+import express from 'express';
+import { BtxChallengeClient } from '@btx-tools/challenges-sdk';
+import { btxAdmission } from '@btx-tools/middleware-express';
+
+const client = new BtxChallengeClient({ rpcUrl: '...', rpcAuth: { ... } });
+const app = express();
+
+app.post(
+  '/v1/generate',
+  btxAdmission({
+    client,
+    purpose: 'ai_inference_gate',
+    resource: (req) => `model:${req.body.model}|route:${req.path}`,
+    subject: (req) => `tenant:${req.body.tenant_id}`,
+  }),
+  (req, res) => res.json({ ok: true, generated: '...' }),
+);
+```
+
+That's it — one line, your route is gated by a BTX service challenge. Full docs at [`@btx-tools/middleware-express`](https://www.npmjs.com/package/@btx-tools/middleware-express) or in the [package README](https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/middleware-express#readme).
+
+Fastify + Hono adapters queued as `@btx-tools/middleware-fastify` + `@btx-tools/middleware-hono`.
+
 ## Roadmap
 
 | Status | Item |
@@ -189,11 +221,12 @@ npx tsx packages/core/tests/perf/solver-bench.ts 10   # 10 attempts
 | ✅ | Day 1: RPC client + types + audit Wave A/B/C fixes |
 | ✅ | Day 2: Solver class with mode dispatch (RPC mode ships) |
 | ✅ | Day 2.5: Pure-JS MatMul solver port, cross-validated against btxd goldens |
+| ✅ | Day 3 (partial): Express middleware → `@btx-tools/middleware-express@0.1.0` |
 | ⏳ | Day 2.6: WASM port of matmul kernel (perf) |
-| ⏳ | Day 3: Express / Fastify / Hono middleware (separate sub-packages) |
+| ⏳ | Day 3 (rest): Fastify + Hono adapters (separate sub-packages) |
 | ⏳ | Day 4: Browser demo + Node examples |
-| ⏳ | Day 5-6: `@btx/mcp-gateway` companion package |
-| ⏳ | Day 7-8: Docs + npm publish |
+| ⏳ | Day 5-6: `@btx-tools/mcp-gateway` companion package |
+| ⏳ | Day 7-8: Docs + announce |
 | ⏳ | Day 9: Findings + handoff |
 
 ## Testing
