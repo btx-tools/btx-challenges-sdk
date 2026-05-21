@@ -36,8 +36,9 @@ jobs:
         run: pnpm -r build
 
       - name: Unit tests
-        # Integration tests need a live btxd + SSH access (not available
-        # in CI runners) — only the unit suite runs here. To run
-        # integration tests locally, see tests/integration/solve-redeem.test.ts
-        # header for the BTX_INTEGRATION_* gate variables.
-        run: pnpm -r --filter '@btx-tools/challenges-sdk' test:unit -- --reporter=verbose
+        # Run unit tests across ALL workspace packages (core + middleware-express).
+        # Integration tests need a live btxd + SSH access (not available in CI
+        # runners) — only the unit suite runs here. To run integration tests
+        # locally, see packages/core/tests/integration/solve-redeem.test.ts for
+        # the BTX_INTEGRATION_* gate variables.
+        run: pnpm -r test:unit -- --reporter=verbose

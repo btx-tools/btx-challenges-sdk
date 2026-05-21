@@ -1,0 +1,79 @@
+{
+  "name": "@btx-tools/middleware-express",
+  "version": "0.1.0",
+  "description": "Express middleware for @btx-tools/challenges-sdk — drop-in BTX service-challenge admission gate",
+  "author": "visitor-code <visitor@friction.market>",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "prepublishOnly": "pnpm build"
+  },
+  "peerDependencies": {
+    "@btx-tools/challenges-sdk": "^0.0.1",
+    "express": "^4.0.0 || ^5.0.0"
+  },
+  "devDependencies": {
+    "@btx-tools/challenges-sdk": "workspace:*",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/supertest": "^6.0.0",
+    "express": "^5.0.0",
+    "prettier": "^3.3.0",
+    "supertest": "^7.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "keywords": [
+    "btx",
+    "express",
+    "middleware",
+    "admission",
+    "rate-limit",
+    "captcha",
+    "ai-gating",
+    "service-challenges",
+    "proof-of-work"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/btx-tools/btx-challenges-sdk.git",
+    "directory": "packages/middleware-express"
+  },
+  "homepage": "https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/middleware-express#readme",
+  "bugs": {
+    "url": "https://github.com/btx-tools/btx-challenges-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.17"
+  }
+}
