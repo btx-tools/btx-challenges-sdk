@@ -38,6 +38,48 @@ app.post('/v1/generate',
 export default app;
 ```
 
+## ⚠️ Body consumption (read before async resolvers)
+
+Hono's `c.req.json()` is **one-shot** — once consumed, the body stream is gone. If your `resource` / `subject` resolver does `await c.req.json()`, the route handler downstream **cannot read the body again** and will throw `BodyAlreadyUsedError`.
+
+❌ **This breaks**:
+```ts
+btxAdmission({
+  // ...
+  resource: async (c) => `model:${(await c.req.json()).model}`,
+}),
+async (c) => {
+  const body = await c.req.json(); // ← throws — body already consumed!
+  return c.json({ ok: true });
+}
+```
+
+✅ **Two safe patterns**:
+
+```ts
+// Pattern 1: cache the body once at the top, pass through context
+app.post('/v1/generate', async (c, next) => {
+  c.set('body', await c.req.json());
+  return next();
+});
+app.post('/v1/generate',
+  btxAdmission({
+    // ...
+    resource: (c) => `model:${(c.get('body') as { model: string }).model}`,
+  }),
+  async (c) => {
+    const body = c.get('body');
+    return c.json({ ok: true, body });
+  },
+);
+
+// Pattern 2: derive resolver inputs from headers, not body
+btxAdmission({
+  // ...
+  resource: (c) => `model:${c.req.header('x-model') ?? 'default'}`,
+}),
+```
+
 ## How it works
 
 Stateless **echo-the-challenge** flow:
@@ -103,10 +145,45 @@ app.onError((err, c) => {
 
 ## Edge-runtime notes
 
-- **Cloudflare Workers / Pages**: works out of the box. `BtxChallengeClient` uses `fetch()` which is the native Workers networking primitive.
-- **Deno Deploy**: same — `fetch()` is standard.
-- **Bun**: same.
-- **Vercel Edge**: works, but check max header size (Vercel Edge caps incoming headers around 16 KB). For high-difficulty challenges the JSON envelope might exceed this — consider switching to a stateful challenge-store middleware variant if you hit this.
+### Network reachability
+
+`BtxChallengeClient` uses `fetch()` to reach btxd's JSON-RPC endpoint. **Edge runtimes cannot reach `127.0.0.1`** — they're sandboxed away from the host loopback. You need a **publicly reachable** btxd RPC URL:
+
+- **Cloudflare Tunnel** (Argo Tunnel) — runs in front of your btxd, gives you a stable HTTPS URL the Worker can call
+- **Public RPC proxy** — terminate TLS at Caddy/nginx in front of btxd, expose on a real DNS name
+- **Self-hosted relay** with a public IP + Basic auth (verify `rpcallowip` in btx.conf permits the egress IP)
+
+Do **not** put btxd's RPC port directly on the public internet without auth + TLS termination.
+
+### Runtime-specific
+
+- **Cloudflare Workers / Pages**: works once reachability is solved. `fetch()` is native; no Node polyfills needed.
+- **Deno Deploy**: same — Web `fetch()` is standard.
+- **Bun**: works natively (also accepts a Node btxd via localhost when self-hosting Bun on the same box).
+- **Vercel Edge**: works for typical challenge sizes. **Header-size limits vary across edge platforms** — Vercel, Cloudflare, and Fastly all have different caps for incoming headers. The `X-BTX-Challenge` header is ~3-5 KB for default difficulty; check your platform's documentation if you set high `target_solve_time_s` or run into preflight errors. For very large challenges, consider a stateful challenge-store middleware variant.
+
+## CORS
+
+The `X-BTX-Challenge`, `X-BTX-Proof-Nonce`, and `X-BTX-Proof-Digest` headers are **custom**, which triggers a CORS preflight for any browser-originated fetch. Configure Hono's built-in `cors` middleware:
+
+```ts
+import { cors } from 'hono/cors';
+app.use('/v1/*', cors({
+  origin: 'https://your-frontend.example',
+  allowHeaders: [
+    'content-type',
+    'x-btx-challenge',
+    'x-btx-challenge-id',
+    'x-btx-proof-nonce',
+    'x-btx-proof-digest',
+  ],
+  exposeHeaders: [
+    'x-btx-challenge', // so the browser can READ the 402's challenge header
+  ],
+}));
+```
+
+Without `exposeHeaders` including `x-btx-challenge`, the browser sees the 402 status but **cannot** read the challenge JSON from the response header (Web Fetch hides non-CORS-safelisted response headers by default).
 
 ## Requirements
 

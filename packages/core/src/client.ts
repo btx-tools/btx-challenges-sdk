@@ -20,6 +20,15 @@ interface JsonRpcResponse<T> {
 }
 
 /**
+ * Upper bound for a single retry delay (per audit M-2, 2026-05-23). At
+ * `attempt=N`, the raw exponential delay is `baseDelayMs * 2^(N-1)` — without
+ * a cap, large `retry.max` values schedule delays past the process lifetime.
+ * 60s gives ample time for transient server-side recovery without absurd
+ * waits.
+ */
+const MAX_RETRY_DELAY_MS = 60_000;
+
+/**
  * Universal UTF-8-safe base64 encoder.
  * Both Node 18.17+ and browsers expose `globalThis.crypto`, but `btoa()`
  * throws on any code point > 0xFF — so we route via TextEncoder for non-ASCII safety.
@@ -104,12 +113,20 @@ export class BtxChallengeClient {
    */
   async call<T = unknown>(method: string, params: unknown[] = []): Promise<T> {
     const retry = this.opts.retry ?? { max: 0 };
+    // H-1 (audit 2026-05-23): clamp non-integer / negative / NaN to ≥0 so the
+    // loop runs at least once and `lastErr` is never thrown undefined.
+    const maxRetries = Math.max(0, Math.floor(Number(retry.max) || 0));
     const baseDelayMs = retry.baseDelayMs ?? 500;
     let lastErr: unknown;
 
-    for (let attempt = 0; attempt <= retry.max; attempt++) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) {
-        const delay = baseDelayMs * Math.pow(2, attempt - 1);
+        // M-2: cap exponential backoff at 60s so a high `max` doesn't schedule
+        // a retry past the process lifetime.
+        const rawDelay = baseDelayMs * Math.pow(2, attempt - 1);
+        const delay = Math.min(rawDelay, MAX_RETRY_DELAY_MS);
+        // M-3: jitter — not security-sensitive; Math.random is appropriate here
+        // (matches the nextRequestId fallback convention per audit A-3).
         const jittered = retry.jitter ? delay + Math.random() * baseDelayMs : delay;
         await new Promise((resolve) => setTimeout(resolve, jittered));
       }
@@ -151,8 +168,18 @@ export class BtxChallengeClient {
     const body = JSON.stringify({ jsonrpc: '1.0', id, method, params });
 
     const ctrl = new AbortController();
-    // D-4: per-method override → client-wide → 30s default
-    const timeoutMs = this.opts.methodTimeouts?.[method] ?? this.opts.timeoutMs ?? 30_000;
+    // D-4: per-method override → client-wide → 30s default.
+    // M-1 (audit 2026-05-23): values ≤ 0 are treated as "no override" — fall
+    // through to the next layer. A literal 0 from methodTimeouts would
+    // otherwise mean "instant abort", which is almost certainly not what the
+    // caller wanted.
+    const perMethod = this.opts.methodTimeouts?.[method];
+    const timeoutMs =
+      perMethod !== undefined && perMethod > 0
+        ? perMethod
+        : this.opts.timeoutMs !== undefined && this.opts.timeoutMs > 0
+          ? this.opts.timeoutMs
+          : 30_000;
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
 
     let res: Response;

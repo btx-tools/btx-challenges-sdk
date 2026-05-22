@@ -155,6 +155,29 @@ Because the middleware is **stateless**, the issuing server and the redeeming se
 
 Same caveat as the core SDK: btxd's service-challenge solver shares the matmul backend with block mining. On a mining-loaded node, the `solvematmulservicechallenge` RPC (used by `Solver.solve({ mode: 'rpc' })` for server-side solving) queues behind block work for 10+ minutes. For production use, point `BtxChallengeClient` at a **dedicated non-mining btxd** (e.g. `gen=0` in `btx.conf`).
 
+### CORS
+
+The `X-BTX-Challenge`, `X-BTX-Proof-Nonce`, and `X-BTX-Proof-Digest` headers are **custom**, which means browser fetches to your gated route will trigger a CORS preflight. Make sure your CORS middleware allows them:
+
+```ts
+import cors from 'cors';
+app.use(cors({
+  origin: 'https://your-frontend.example',
+  allowedHeaders: [
+    'content-type',
+    'x-btx-challenge',
+    'x-btx-challenge-id',
+    'x-btx-proof-nonce',
+    'x-btx-proof-digest',
+  ],
+  exposedHeaders: [
+    'x-btx-challenge', // so the browser can READ the 402's challenge header
+  ],
+}));
+```
+
+Without `exposedHeaders` including `x-btx-challenge`, the browser sees the 402 status but **cannot** read the challenge JSON from the response header (Web Fetch hides non-CORS-safelisted response headers by default).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

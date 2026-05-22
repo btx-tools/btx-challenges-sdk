@@ -208,9 +208,16 @@ export interface SolverOutput {
  * Audit ref: D-3 in `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`.
  */
 export interface RetryOptions {
-  /** Maximum number of retry attempts (in addition to the initial call). `0` disables retry. */
+  /**
+   * Maximum number of retry attempts (in addition to the initial call). `0`
+   * disables retry. Non-integer / negative / NaN values are clamped to `0`.
+   */
   max: number;
-  /** Base delay in ms between attempts. Doubles each retry. Default 500. */
+  /**
+   * Base delay in ms between attempts. The actual delay between attempt N and
+   * N+1 is `baseDelayMs * 2^(N-1)`, **capped at 60 s** so a high `max` doesn't
+   * schedule delays past the process lifetime. Default 500 ms.
+   */
   baseDelayMs?: number;
   /** If `true`, adds `random(0, baseDelayMs)` of jitter to each delay. Default `false`. */
   jitter?: boolean;
@@ -232,10 +239,16 @@ export interface BtxClientOpts {
     user: string;
     pass: string;
   };
-  /** Client-wide request timeout in ms (default 30000). Overridden per-method by {@link methodTimeouts}. */
+  /**
+   * Client-wide request timeout in ms (default 30000). Overridden per-method
+   * by {@link methodTimeouts}. Values ≤ 0 are treated as "no override" and
+   * fall through to the 30000 ms default.
+   */
   timeoutMs?: number;
   /**
    * Per-method timeout overrides (ms). Falls back to {@link timeoutMs}, then 30000.
+   * Values ≤ 0 are treated as "no override" — fall through to the next layer
+   * (audit M-1 2026-05-23).
    *
    * Useful because RPCs have very different time profiles: `solvematmulservicechallenge`
    * on a mining-loaded btxd can take 15+ minutes ({@link https://github.com/btx-tools/btx-challenges-sdk see btxd-solver-mining-contention}),

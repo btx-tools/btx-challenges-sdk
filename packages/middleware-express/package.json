@@ -1,6 +1,6 @@
 {
   "name": "@btx-tools/middleware-express",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Express middleware for @btx-tools/challenges-sdk — drop-in BTX service-challenge admission gate",
   "author": "visitor-code <visitor@friction.market>",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "@btx-tools/middleware-hono",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Hono middleware for @btx-tools/challenges-sdk — drop-in BTX service-challenge admission gate (Node + edge)",
   "author": "visitor-code <visitor@friction.market>",
   "license": "MIT",

@@ -244,7 +244,16 @@ function resolve(value: StringOrFn, req: FastifyRequest): string {
   return typeof value === 'function' ? value(req) : value;
 }
 
-/** Fastify header values can be string | string[] | undefined; normalize to string. */
+/**
+ * Fastify header values can be string | string[] | undefined; normalize to
+ * string by returning the first occurrence.
+ *
+ * Note (audit M-7 2026-05-23): when a duplicate header is sent (HTTP permits
+ * duplicates), we intentionally pick the FIRST value. This matches standard
+ * proxy behavior and avoids ambiguity. If a reverse proxy in front reorders
+ * duplicate headers, the SDK's behavior follows that proxy's order. None of
+ * the BTX headers should legitimately arrive duplicated under normal use.
+ */
 function headerValue(req: FastifyRequest, name: string): string | undefined {
   const v = req.headers[name];
   if (Array.isArray(v)) return v[0];
