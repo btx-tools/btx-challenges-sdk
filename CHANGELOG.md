@@ -4,6 +4,44 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-23
+
+Minor release — adds AbortSignal plumbing across the public client surface. Backwards-compatible with `0.1.1` (all new args are optional and trailing).
+
+### Added — `@btx-tools/challenges-sdk` (0.1.1 → 0.2.0)
+
+- **`RpcCallOpts`** — new exported type. Currently has one field: `signal?: AbortSignal`. Open-shape so future per-call options (per-call header overrides, per-call timeout overrides) can land additively without another version bump.
+- **`signal?: AbortSignal` plumbed end-to-end** through every public client method:
+  - `client.call<T>(method, params?, opts?)`
+  - `client.issue(params, opts?)`
+  - `client.verify(challenge, nonce, digest, lookup?, opts?)`
+  - `client.redeem(challenge, nonce, digest, opts?)`
+  - `client.verifyBatch(entries, opts?)`
+  - `client.redeemBatch(entries, opts?)`
+  - `client.solve(challenge, opts?)`
+
+  Behavior: external signal is composed with the internal timeout AbortController. If the external signal fires:
+  - **Before fetch starts** (or before call enters retry loop) → throws `BtxNetworkError` immediately, no request sent
+  - **During fetch** → underlying fetch is aborted, throws `BtxNetworkError` (distinguishable from `BtxTimeoutError` — the cause is a `CallerAbortError` not an internal timer)
+  - **During retry backoff sleep** → backoff is interrupted, retry loop exits, throws `BtxNetworkError`. No further requests sent.
+
+  Caveat for `redeem` / `redeemBatch`: if the abort fires AFTER btxd has consumed the challenge (RPC completed server-side before the local fetch was aborted), the redemption stands. Callers handling cancellation should verify via a separate `verify()` if post-abort state matters.
+
+### Motivation
+
+Closes audit MED-8 from `internal notes`. The MCP gateway needed to forward its `extra.signal` from agent client tool-call cancellations into the BTX RPC client; before this change, the SDK had no way to accept an external signal. Now the gateway can plumb cancellation end-to-end.
+
+### Test delta
+
+161 → 168 tests (+7 new abort-specific tests covering: pre-aborted signal fast-path, mid-fetch abort, internal-timeout vs external-abort disambiguation, abort during retry backoff, no-abort regression, signal propagation through `issue()` + `redeem()`).
+
+### Deferred (still queued for a later minor)
+
+- `RetryOptions.onRetry?: (attempt, err, nextDelayMs) => void` observability callback (L-3 from 0.1.1 audit)
+- Semantic shortcut keys for `methodTimeouts` (e.g. `{ solve: ... }`) (L-4 from 0.1.1 audit)
+
+Both can land in a `0.2.x` patch or `0.3.0` minor without breaking 0.2.0 consumers.
+
 ### Added
 
 - **`examples/` directory** — three runnable adopter examples at workspace root:

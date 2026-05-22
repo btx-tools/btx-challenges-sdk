@@ -29,6 +29,7 @@ export {
   type DifficultyPolicy,
   type IssueParams,
   type RetryOptions,
+  type RpcCallOpts,
   type SolverOutput,
   type VerifyReason,
   type VerifyResult,

@@ -223,6 +223,35 @@ export interface RetryOptions {
   jitter?: boolean;
 }
 
+/**
+ * Per-call options accepted by every public method on {@link BtxChallengeClient}.
+ *
+ * Added in 0.2.0. Optional. Defaults preserve 0.1.x behavior — no change for
+ * callers that don't pass an opts arg.
+ */
+export interface RpcCallOpts {
+  /**
+   * Optional AbortSignal to cancel the request. When the signal fires `abort`:
+   * - If the signal is already aborted before the call starts, the method
+   *   throws {@link BtxNetworkError} immediately without sending a request.
+   * - If the signal fires mid-fetch, the underlying fetch is aborted and the
+   *   call throws {@link BtxNetworkError} (distinguishable from
+   *   {@link BtxTimeoutError} — see `cause` for the underlying CallerAbortError).
+   * - If the signal fires during a retry backoff sleep, the retry loop exits
+   *   immediately without sending another request.
+   *
+   * Honored across the full retry pipeline.
+   *
+   * **Caveat for {@link BtxChallengeClient.redeem}** and {@link BtxChallengeClient.redeemBatch}:
+   * if the abort fires AFTER btxd has consumed the challenge (the RPC completed
+   * server-side before the local fetch was aborted), the redemption stands
+   * — the local promise rejects but btxd has already marked the proof spent.
+   * Callers handling cancellation should verify via a separate {@link BtxChallengeClient.verify}
+   * call if the post-abort state matters.
+   */
+  signal?: AbortSignal;
+}
+
 /** RPC client configuration. */
 export interface BtxClientOpts {
   /**

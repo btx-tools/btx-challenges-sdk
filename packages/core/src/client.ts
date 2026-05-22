@@ -9,6 +9,7 @@ import {
   type BtxClientOpts,
   type Challenge,
   type IssueParams,
+  type RpcCallOpts,
   type SolverOutput,
   type VerifyResult,
 } from './types.js';
@@ -27,6 +28,44 @@ interface JsonRpcResponse<T> {
  * waits.
  */
 const MAX_RETRY_DELAY_MS = 60_000;
+
+/**
+ * Sentinel error thrown internally when an external AbortSignal fires. Caught
+ * at the public-method boundary and rethrown as {@link BtxNetworkError} so
+ * callers see a documented error type. Added 0.2.0.
+ */
+class CallerAbortError extends Error {
+  constructor() {
+    super('aborted by caller');
+    this.name = 'CallerAbortError';
+  }
+}
+
+/**
+ * Abortable setTimeout. Resolves after `ms`; rejects with CallerAbortError
+ * if `signal` fires during the wait. Added 0.2.0.
+ */
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new CallerAbortError());
+      return;
+    }
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    const onAbort = (): void => {
+      cleanup();
+      reject(new CallerAbortError());
+    };
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener('abort', onAbort);
+    };
+    if (signal) signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
 
 /**
  * Universal UTF-8-safe base64 encoder.
@@ -111,13 +150,23 @@ export class BtxChallengeClient {
    * audit D-3). Both are opt-in via constructor options; default behavior is
    * unchanged from 0.0.4 (30s single-attempt).
    */
-  async call<T = unknown>(method: string, params: unknown[] = []): Promise<T> {
+  async call<T = unknown>(
+    method: string,
+    params: unknown[] = [],
+    opts?: RpcCallOpts,
+  ): Promise<T> {
     const retry = this.opts.retry ?? { max: 0 };
     // H-1 (audit 2026-05-23): clamp non-integer / negative / NaN to ≥0 so the
     // loop runs at least once and `lastErr` is never thrown undefined.
     const maxRetries = Math.max(0, Math.floor(Number(retry.max) || 0));
     const baseDelayMs = retry.baseDelayMs ?? 500;
     let lastErr: unknown;
+
+    // Fast-path: caller's signal already aborted before we did any work.
+    // 0.2.0: AbortSignal plumbing per mcp-gateway audit MED-8.
+    if (opts?.signal?.aborted) {
+      throw new BtxNetworkError(new CallerAbortError(), method);
+    }
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) {
@@ -128,10 +177,19 @@ export class BtxChallengeClient {
         // M-3: jitter — not security-sensitive; Math.random is appropriate here
         // (matches the nextRequestId fallback convention per audit A-3).
         const jittered = retry.jitter ? delay + Math.random() * baseDelayMs : delay;
-        await new Promise((resolve) => setTimeout(resolve, jittered));
+        try {
+          // 0.2.0: backoff sleep honors external abort signal — caller-cancel
+          // mid-retry exits the loop without sending another request.
+          await abortableDelay(jittered, opts?.signal);
+        } catch (err) {
+          if (err instanceof CallerAbortError) {
+            throw new BtxNetworkError(err, method);
+          }
+          throw err;
+        }
       }
       try {
-        return await this.callOnce<T>(method, params);
+        return await this.callOnce<T>(method, params, opts?.signal);
       } catch (err) {
         lastErr = err;
         if (!this.isRetryable(err)) throw err;
@@ -160,7 +218,11 @@ export class BtxChallengeClient {
   }
 
   /** Single attempt of the JSON-RPC call (no retry wrapping). */
-  private async callOnce<T>(method: string, params: unknown[]): Promise<T> {
+  private async callOnce<T>(
+    method: string,
+    params: unknown[],
+    externalSignal?: AbortSignal,
+  ): Promise<T> {
     const id = nextRequestId();
     const auth = 'Basic ' + base64Utf8(`${this.opts.rpcAuth.user}:${this.opts.rpcAuth.pass}`);
     // JSON-RPC "1.0" is correct for Bitcoin-family btxd (NOT 2.0 as Ethereum-style uses).
@@ -182,6 +244,20 @@ export class BtxChallengeClient {
           : 30_000;
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
 
+    // 0.2.0: compose external caller signal with the internal timeout
+    // controller. When EITHER fires, fetch aborts. Pre-check is for the case
+    // where the caller aborted between `call()` entry and `callOnce()` — we
+    // surface a CallerAbortError before paying for a fetch.
+    let onExtAbort: (() => void) | undefined;
+    if (externalSignal) {
+      if (externalSignal.aborted) {
+        clearTimeout(timer);
+        throw new BtxNetworkError(new CallerAbortError(), method);
+      }
+      onExtAbort = (): void => ctrl.abort();
+      externalSignal.addEventListener('abort', onExtAbort, { once: true });
+    }
+
     let res: Response;
     try {
       res = await fetch(this.opts.rpcUrl, {
@@ -195,13 +271,25 @@ export class BtxChallengeClient {
       });
     } catch (err) {
       clearTimeout(timer);
-      // AbortError on timeout vs everything else (DNS, TCP reset, TLS, etc.)
+      if (onExtAbort && externalSignal) {
+        externalSignal.removeEventListener('abort', onExtAbort);
+      }
+      // AbortError can be: (a) internal timeout fired, (b) external caller
+      // signal fired. Disambiguate via externalSignal.aborted. Order matters:
+      // check external first because both signals may be aborted by the time
+      // we land here (timeout + caller-cancel both within the same tick).
       if (err instanceof Error && err.name === 'AbortError') {
+        if (externalSignal?.aborted) {
+          throw new BtxNetworkError(new CallerAbortError(), method);
+        }
         throw new BtxTimeoutError(timeoutMs, method);
       }
       throw new BtxNetworkError(err, method);
     } finally {
       clearTimeout(timer);
+      if (onExtAbort && externalSignal) {
+        externalSignal.removeEventListener('abort', onExtAbort);
+      }
     }
 
     if (!res.ok) {
@@ -223,8 +311,11 @@ export class BtxChallengeClient {
     return data.result;
   }
 
-  /** Issue a fresh challenge bound to (purpose, resource, subject). */
-  async issue(params: IssueParams): Promise<Challenge> {
+  /**
+   * Issue a fresh challenge bound to (purpose, resource, subject).
+   * `opts.signal` (added 0.2.0) cancels the request if the caller aborts.
+   */
+  async issue(params: IssueParams, opts?: RpcCallOpts): Promise<Challenge> {
     // Per audit M3: do NOT hardcode btxd defaults. Truncate positional args at
     // the last explicitly-set value so btxd applies its own defaults for omitted ones.
     const ordered: Array<[string, unknown]> = [
@@ -250,7 +341,7 @@ export class BtxChallengeClient {
       }
     }
     const args = ordered.slice(0, lastSet + 1).map(([, v]) => v);
-    return this.call<Challenge>('getmatmulservicechallenge', args);
+    return this.call<Challenge>('getmatmulservicechallenge', args, opts);
   }
 
   /**
@@ -258,56 +349,75 @@ export class BtxChallengeClient {
    * Use this for diagnostic / monitoring paths.
    * For admission control, use {@link redeem} instead — verification alone
    * does not prevent replay.
+   *
+   * `opts.signal` (added 0.2.0) cancels the request if the caller aborts.
    */
   async verify(
     challenge: Challenge,
     nonce64_hex: string,
     digest_hex: string,
     lookup_local_status = true,
+    opts?: RpcCallOpts,
   ): Promise<VerifyResult> {
-    return this.call<VerifyResult>('verifymatmulserviceproof', [
-      challenge,
-      nonce64_hex,
-      digest_hex,
-      lookup_local_status,
-    ]);
+    return this.call<VerifyResult>(
+      'verifymatmulserviceproof',
+      [challenge, nonce64_hex, digest_hex, lookup_local_status],
+      opts,
+    );
   }
 
   /**
    * Verify-and-consume atomically. THIS is the admission control entry point.
    * On success, the challenge is marked redeemed and cannot be replayed.
+   *
+   * `opts.signal` (added 0.2.0) cancels the request if the caller aborts —
+   * but note: if the abort fires AFTER btxd has consumed the challenge,
+   * the redemption stands (atomic) even though the local promise rejects.
+   * Callers handling cancellation must treat post-abort state as "may have
+   * been consumed" and verify via a separate `verify()` call if needed.
    */
   async redeem(
     challenge: Challenge,
     nonce64_hex: string,
     digest_hex: string,
+    opts?: RpcCallOpts,
   ): Promise<VerifyResult> {
-    return this.call<VerifyResult>('redeemmatmulserviceproof', [
-      challenge,
-      nonce64_hex,
-      digest_hex,
-    ]);
+    return this.call<VerifyResult>(
+      'redeemmatmulserviceproof',
+      [challenge, nonce64_hex, digest_hex],
+      opts,
+    );
   }
 
-  /** Batch verify. Spec range 1–256 (audit M2). No consumption. */
-  async verifyBatch(entries: BatchEntry[]): Promise<BatchResult> {
+  /**
+   * Batch verify. Spec range 1–256 (audit M2). No consumption.
+   * `opts.signal` (added 0.2.0) cancels the request if the caller aborts.
+   */
+  async verifyBatch(entries: BatchEntry[], opts?: RpcCallOpts): Promise<BatchResult> {
     this.assertBatchSize(entries);
-    return this.call<BatchResult>('verifymatmulserviceproofs', [entries]);
+    return this.call<BatchResult>('verifymatmulserviceproofs', [entries], opts);
   }
 
-  /** Batch verify + consume. Sequential per-entry. Spec range 1–256 (audit M2). */
-  async redeemBatch(entries: BatchEntry[]): Promise<BatchResult> {
+  /**
+   * Batch verify + consume. Sequential per-entry. Spec range 1–256 (audit M2).
+   * `opts.signal` (added 0.2.0) cancels the request if the caller aborts.
+   * Same post-abort caveat as {@link redeem} — partial batch may have been
+   * consumed by btxd before the abort propagated.
+   */
+  async redeemBatch(entries: BatchEntry[], opts?: RpcCallOpts): Promise<BatchResult> {
     this.assertBatchSize(entries);
-    return this.call<BatchResult>('redeemmatmulserviceproofs', [entries]);
+    return this.call<BatchResult>('redeemmatmulserviceproofs', [entries], opts);
   }
 
   /**
    * Server-side local solver. Useful when generating fixtures or pre-computing
    * for tests. For production browser-side solving, ship the WASM solver —
    * RPC-based solving puts compute load on YOUR node, defeating the point.
+   *
+   * `opts.signal` (added 0.2.0) cancels the request if the caller aborts.
    */
-  async solve(challenge: Challenge): Promise<SolverOutput> {
-    return this.call<SolverOutput>('solvematmulservicechallenge', [challenge]);
+  async solve(challenge: Challenge, opts?: RpcCallOpts): Promise<SolverOutput> {
+    return this.call<SolverOutput>('solvematmulservicechallenge', [challenge], opts);
   }
 
   private assertBatchSize(entries: BatchEntry[]): void {

@@ -676,3 +676,123 @@ describe('BtxChallengeClient — D-3 + D-4 audit 0.1.1 hardening (audit 2026-05-
     expect(c.challenge_id).toBe('test-cid');
   });
 });
+
+describe('BtxChallengeClient — AbortSignal plumbing (0.2.0)', () => {
+  it('throws BtxNetworkError immediately if signal is already aborted before call', async () => {
+    server.use(
+      http.post(RPC_URL, () => HttpResponse.json({ result: stubChallenge, error: null, id: 1 })),
+    );
+    const client = makeClient();
+    const ctrl = new AbortController();
+    ctrl.abort();
+    await expect(client.call('m', [], { signal: ctrl.signal })).rejects.toBeInstanceOf(
+      BtxNetworkError,
+    );
+  });
+
+  it('aborts in-flight request when external signal fires; throws BtxNetworkError', async () => {
+    server.use(
+      http.post(RPC_URL, async () => {
+        await new Promise((r) => setTimeout(r, 500));
+        return HttpResponse.json({ result: 'late', error: null, id: 1 });
+      }),
+    );
+    const client = makeClient({ timeoutMs: 5_000 });
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 50);
+    const t0 = Date.now();
+    let caught: unknown;
+    try {
+      await client.call('slow', [], { signal: ctrl.signal });
+    } catch (err) {
+      caught = err;
+    }
+    const elapsed = Date.now() - t0;
+    expect(caught).toBeInstanceOf(BtxNetworkError);
+    // Not a timeout
+    expect(caught).not.toBeInstanceOf(BtxTimeoutError);
+    // Aborted well before the 500ms server delay
+    expect(elapsed).toBeLessThan(300);
+  });
+
+  it('distinguishes internal timeout from external abort', async () => {
+    server.use(
+      http.post(RPC_URL, async () => {
+        await new Promise((r) => setTimeout(r, 500));
+        return HttpResponse.json({ result: 'late', error: null, id: 1 });
+      }),
+    );
+    const client = makeClient({ timeoutMs: 50 });
+    // No external signal — internal timeout should fire
+    await expect(client.call('slow')).rejects.toBeInstanceOf(BtxTimeoutError);
+  });
+
+  it('aborts during retry backoff (does not send additional requests)', async () => {
+    let requestCount = 0;
+    server.use(
+      http.post(RPC_URL, () => {
+        requestCount += 1;
+        // First request fails with 503 → retry; abort fires during backoff
+        return HttpResponse.json({ error: 'oops' }, { status: 503 });
+      }),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      timeoutMs: 5_000,
+      retry: { max: 5, baseDelayMs: 200 },
+    });
+    const ctrl = new AbortController();
+    // Fire abort during the first backoff sleep (which starts ~immediately after attempt 1 fails)
+    setTimeout(() => ctrl.abort(), 100);
+    await expect(client.call('flaky', [], { signal: ctrl.signal })).rejects.toBeInstanceOf(
+      BtxNetworkError,
+    );
+    // Should have made exactly 1 request (first failed, then aborted during backoff)
+    expect(requestCount).toBe(1);
+  });
+
+  it('signal does not abort → normal completion (no regression)', async () => {
+    server.use(
+      http.post(RPC_URL, () => HttpResponse.json({ result: stubChallenge, error: null, id: 1 })),
+    );
+    const client = makeClient();
+    const ctrl = new AbortController();
+    const c = await client.issue(
+      { purpose: 'rate_limit', resource: 'r', subject: 's' },
+      { signal: ctrl.signal },
+    );
+    expect(c.challenge_id).toBe('test-cid');
+    expect(ctrl.signal.aborted).toBe(false);
+  });
+
+  it('signal propagates from issue() through to underlying call', async () => {
+    server.use(
+      http.post(RPC_URL, async () => {
+        await new Promise((r) => setTimeout(r, 500));
+        return HttpResponse.json({ result: stubChallenge, error: null, id: 1 });
+      }),
+    );
+    const client = makeClient({ timeoutMs: 5_000 });
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 50);
+    await expect(
+      client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }, { signal: ctrl.signal }),
+    ).rejects.toBeInstanceOf(BtxNetworkError);
+  });
+
+  it('signal propagates from redeem() through to underlying call', async () => {
+    server.use(
+      http.post(RPC_URL, async () => {
+        await new Promise((r) => setTimeout(r, 500));
+        return HttpResponse.json({ result: { valid: true }, error: null, id: 1 });
+      }),
+    );
+    const client = makeClient({ timeoutMs: 5_000 });
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 50);
+    await expect(
+      client.redeem(stubChallenge, 'a'.repeat(16), 'b'.repeat(64), { signal: ctrl.signal }),
+    ).rejects.toBeInstanceOf(BtxNetworkError);
+  });
+});
