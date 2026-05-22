@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BTX challenges SDK — browser solver demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+      }
+      body {
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+      }
+      h1 { font-weight: 600; margin-bottom: 0.25rem; }
+      .subtitle { color: #888; margin-top: 0; }
+      label { display: block; margin: 1rem 0 0.25rem; font-size: 0.9rem; }
+      input, textarea {
+        width: 100%;
+        font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+        font-size: 0.85rem;
+        padding: 0.4rem 0.6rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      textarea { min-height: 5rem; resize: vertical; }
+      button {
+        margin-top: 1rem;
+        padding: 0.6rem 1.2rem;
+        font-size: 0.95rem;
+        cursor: pointer;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 4px;
+      }
+      button:disabled { background: #888; cursor: wait; }
+      #status {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background: #f5f5f5;
+        border-radius: 4px;
+        font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+        font-size: 0.85rem;
+        white-space: pre-wrap;
+      }
+      table {
+        margin-top: 1.5rem;
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+      }
+      th, td {
+        text-align: left;
+        padding: 0.4rem 0.6rem;
+        border-bottom: 1px solid #ddd;
+      }
+      th { background: #eee; }
+      tr.ok td { color: #166534; }
+      tr.fail td { color: #991b1b; }
+      @media (prefers-color-scheme: dark) {
+        body { background: #0a0a0a; color: #eee; }
+        input, textarea { background: #1a1a1a; color: #eee; border-color: #444; }
+        #status { background: #1a1a1a; }
+        th { background: #222; }
+        th, td { border-color: #333; }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>BTX challenges SDK — browser solver demo</h1>
+    <p class="subtitle">Issues a challenge against your gated endpoint, solves it in a Web Worker, retries with proof headers. Records per-attempt wall-clock.</p>
+
+    <label for="gate-url">Gate URL (the POST endpoint that returns 402)</label>
+    <input id="gate-url" type="text" value="http://localhost:3000/v1/generate" />
+
+    <label for="body">Request body (JSON)</label>
+    <textarea id="body">{"model":"demo","tenant_id":"local"}</textarea>
+
+    <label for="cycles">Cycles to run (more = better perf measurement)</label>
+    <input id="cycles" type="number" min="1" max="20" value="3" />
+
+    <button id="run">Run cycles</button>
+
+    <div id="status">Click Run cycles to start.</div>
+
+    <table id="results" hidden>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>402 (ms)</th>
+          <th>solve (ms)</th>
+          <th>200 (ms)</th>
+          <th>total (ms)</th>
+          <th>status</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
