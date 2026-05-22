@@ -6,10 +6,16 @@ Workspace root for `@btx-tools/challenges-sdk` and companion middleware packages
 
 | Package | Description | Latest |
 |---|---|---|
-| [`@btx-tools/challenges-sdk`](./packages/core) | Core RPC client + Solver (RPC + pure-JS modes) + algorithm port | **0.1.0** |
-| [`@btx-tools/middleware-express`](./packages/middleware-express) | Express middleware adapter | **0.2.1** |
-| [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter | **0.1.0** |
-| [`@btx-tools/middleware-hono`](./packages/middleware-hono) | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | **0.1.0** |
+| [`@btx-tools/challenges-sdk`](./packages/core) | Core RPC client + Solver (RPC + pure-JS modes) + algorithm port | **0.1.1** |
+| [`@btx-tools/middleware-express`](./packages/middleware-express) | Express middleware adapter | **0.2.2** |
+| [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter | **0.1.1** |
+| [`@btx-tools/middleware-hono`](./packages/middleware-hono) | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | **0.1.1** |
+
+### Sibling packages (separate repos)
+
+| Package | Description | Repo |
+|---|---|---|
+| [`@btx-tools/mcp-gateway`](https://www.npmjs.com/package/@btx-tools/mcp-gateway) | **MCP server framework** that gates every tool invocation behind a BTX service-challenge proof — for agentic AI admission control. Companion to this SDK. | [btx-tools/btx-mcp-gateway](https://github.com/btx-tools/btx-mcp-gateway) |
 
 Roadmap to `1.0.0`: operator-private — see internal `BTX/ecosystem/sdk-finishing-plan-2026-05-22.md`.
 
@@ -23,6 +29,9 @@ npm install @btx-tools/challenges-sdk
 npm install @btx-tools/challenges-sdk @btx-tools/middleware-express express
 npm install @btx-tools/challenges-sdk @btx-tools/middleware-fastify fastify
 npm install @btx-tools/challenges-sdk @btx-tools/middleware-hono hono
+
+# For agent / MCP admission gating (separate package, see https://github.com/btx-tools/btx-mcp-gateway)
+npm install @btx-tools/challenges-sdk @btx-tools/mcp-gateway @modelcontextprotocol/sdk zod
 ```
 
 Then see the per-package README:
