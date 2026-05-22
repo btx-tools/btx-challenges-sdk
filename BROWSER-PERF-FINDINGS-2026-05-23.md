@@ -1,14 +1,38 @@
 # Browser pure-JS solver perf — findings + WASM decision
 
-> **Date**: 2026-05-23
+> **Date**: 2026-05-23 (significantly updated post-spike same day)
 > **Author**: SDK Phase 3 ship session
-> **Scope**: measure pure-JS solver wall-clock in Node + browser, decide whether to ship a WASM matmul kernel as part of the SDK 1.0.0 line or defer to roadmap v2.
+> **Scope**: measure pure-JS solver wall-clock + measure WASM speedup via a Rust spike, decide whether browser captcha at 1-4s admission UX is achievable.
 
-## TL;DR
+## TL;DR — REVISED post-spike
 
-**Decision: defer WASM matmul kernel to post-1.0.0 roadmap.** Pure-JS at floor difficulty already takes ~7 minutes per attempt on M-series Mac — slow, but acceptable for the SDK's primary adopter modes (server-side Node with `mode: 'rpc'` against a dedicated btxd, or one-shot browser admission). WASM would reduce per-attempt wall-clock by an estimated 10-20× (matching btxd's native C++ baseline more closely), which is meaningful for high-throughput browser deployments but is not blocking the API freeze.
+**Decision: BROWSER CAPTCHA AT 1-4s IS NOT VIABLE with the current BTX matmul proof primitive.** No combination of WASM + SIMD + multi-worker parallelism closes the ~1000× gap between browser-deployable solvers and the 1-4s UX budget at btx.dev's recommended production difficulty.
 
-The 1.0.0 SDK ships pure-JS only. WASM lands in `0.3.x` or `1.1.x` if browser adopters surface the need.
+The SDK ships **server-side admission middleware** as the production path. Pure-JS Solver is reference-only for one-shot scripts, CI fixtures, and demonstrating the wire protocol. See [`USE-CASES.md`](./USE-CASES.md) for the recommendation table.
+
+Browser captcha may become viable if the BTX team adds a browser-friendly proof primitive (Argon2-style memory-hard, smaller-n matmul variant, VDF) — that's an upstream protocol change tracked separately.
+
+### Spike receipts (Node 22 on M-series Mac)
+
+Crate at `~/code/btx-challenges-wasm/`, build via `wasm-pack build --target nodejs --release`.
+
+| Bench | Pure-JS BigInt | WASM (Rust + i32) | Speedup |
+|---|---|---|---|
+| `M31::mul` (isolated) | 14.7 Mops/s | 417 Mops/s | **28.4×** |
+| `M31::dot(len=512)` (the actual hot loop) | 35.8 Mops/s | 879 Mops/s | **24.5×** |
+
+Cross-validated byte-equal vs pure-JS on 20 random mul pairs + 5 dot arrays of length 512.
+
+### Projected full-WASM browser solve at production difficulty
+
+| Stack | Wall-clock at `target_solve_time_s=1.0` |
+|---|---|
+| Pure-JS (today) | ~32 days |
+| Full WASM kernel | ~32 hours |
+| + SIMD128 (proj. 2-4×) | ~8 hours |
+| + 8 parallel Web Workers | ~1 hour |
+
+**Even the most optimistic stack lands ~1000× over the 1-4s budget.** No incremental engineering closes that gap.
 
 ## What we measured
 
