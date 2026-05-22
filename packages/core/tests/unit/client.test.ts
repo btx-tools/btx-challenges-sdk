@@ -323,3 +323,214 @@ describe('BtxChallengeClient — batch size guard (audit M2)', () => {
     await expect(makeClient().redeemBatch(entries)).rejects.toBeInstanceOf(RangeError);
   });
 });
+
+describe('BtxChallengeClient — D-4 per-method timeout (audit D-4)', () => {
+  it('methodTimeouts[method] overrides client-wide timeoutMs', async () => {
+    let timedOut = false;
+    server.use(
+      http.post(RPC_URL, async () => {
+        // Hold past the per-method budget (50ms) but well under client-wide (5000ms)
+        await new Promise((r) => setTimeout(r, 200));
+        return HttpResponse.json({ result: stubChallenge, error: null, id: 1 });
+      }),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      timeoutMs: 5_000,
+      methodTimeouts: { getmatmulservicechallenge: 50 },
+    });
+    try {
+      await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    } catch (err) {
+      timedOut = err instanceof BtxTimeoutError;
+    }
+    expect(timedOut).toBe(true);
+  });
+
+  it('falls back to client-wide timeoutMs when method has no override', async () => {
+    server.use(
+      http.post(RPC_URL, () =>
+        HttpResponse.json({ result: stubChallenge, error: null, id: 1 }),
+      ),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      timeoutMs: 5_000,
+      methodTimeouts: { verifymatmulserviceproof: 50 }, // not the method we'll call
+    });
+    // issue → getmatmulservicechallenge → no override → uses 5000ms
+    const c = await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    expect(c.challenge_id).toBe('test-cid');
+  });
+
+  it('falls back to 30s default when neither override nor timeoutMs is set', async () => {
+    // Only assert the option resolves cleanly. We don't want to actually wait 30s
+    // to confirm the default; covered by code review of client.ts:62.
+    server.use(
+      http.post(RPC_URL, () =>
+        HttpResponse.json({ result: stubChallenge, error: null, id: 1 }),
+      ),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      // no timeoutMs, no methodTimeouts
+    });
+    const c = await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    expect(c.challenge_id).toBe('test-cid');
+  });
+
+  it('per-method long timeout enables a slow solve without bloating client-wide', async () => {
+    server.use(
+      http.post(RPC_URL, async ({ request }) => {
+        const body = (await request.json()) as { method: string };
+        // Short delay for getmatmulservicechallenge (issue), longer for solve
+        if (body.method === 'solvematmulservicechallenge') {
+          await new Promise((r) => setTimeout(r, 150));
+        }
+        return HttpResponse.json({
+          result: body.method === 'getmatmulservicechallenge'
+            ? stubChallenge
+            : { nonce64_hex: '0'.repeat(16), digest_hex: '0'.repeat(64), proof: {} },
+          error: null,
+          id: 1,
+        });
+      }),
+    );
+    // Client-wide is 50ms (would kill solve), but we set 500ms specifically for solve
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      timeoutMs: 50,
+      methodTimeouts: {
+        getmatmulservicechallenge: 5_000,
+        solvematmulservicechallenge: 500,
+      },
+    });
+    // Both calls should succeed because each has a per-method budget that fits its work.
+    const c = await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    expect(c.challenge_id).toBe('test-cid');
+    const p = await client.solve(c);
+    expect(p.nonce64_hex).toMatch(/^[0-9a-f]{16}$/);
+  });
+});
+
+describe('BtxChallengeClient — D-3 retry/backoff (audit D-3)', () => {
+  it('default behavior: retry: { max: 0 } means single attempt', async () => {
+    let attempts = 0;
+    server.use(
+      http.post(RPC_URL, () => {
+        attempts++;
+        return HttpResponse.text('boom', { status: 502 });
+      }),
+    );
+    await expect(
+      makeClient().issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
+    ).rejects.toBeInstanceOf(BtxHttpError);
+    expect(attempts).toBe(1);
+  });
+
+  it('retries on 5xx HTTP responses up to max', async () => {
+    let attempts = 0;
+    server.use(
+      http.post(RPC_URL, () => {
+        attempts++;
+        return HttpResponse.text('boom', { status: 503 });
+      }),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      retry: { max: 2, baseDelayMs: 1 },
+    });
+    await expect(
+      client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
+    ).rejects.toBeInstanceOf(BtxHttpError);
+    // 1 initial + 2 retries = 3 attempts
+    expect(attempts).toBe(3);
+  });
+
+  it('succeeds after transient 5xx if the next attempt is 200', async () => {
+    let attempts = 0;
+    server.use(
+      http.post(RPC_URL, () => {
+        attempts++;
+        if (attempts < 3) return HttpResponse.text('flap', { status: 502 });
+        return HttpResponse.json({ result: stubChallenge, error: null, id: 1 });
+      }),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      retry: { max: 3, baseDelayMs: 1 },
+    });
+    const c = await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    expect(c.challenge_id).toBe('test-cid');
+    expect(attempts).toBe(3);
+  });
+
+  it('does NOT retry on 4xx HTTP responses', async () => {
+    let attempts = 0;
+    server.use(
+      http.post(RPC_URL, () => {
+        attempts++;
+        return HttpResponse.text('nope', { status: 401 });
+      }),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      retry: { max: 5, baseDelayMs: 1 },
+    });
+    await expect(
+      client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
+    ).rejects.toBeInstanceOf(BtxHttpError);
+    expect(attempts).toBe(1);
+  });
+
+  it('does NOT retry on JSON-RPC error envelope (deterministic)', async () => {
+    let attempts = 0;
+    server.use(
+      http.post(RPC_URL, () => {
+        attempts++;
+        return HttpResponse.json({
+          result: null,
+          error: { code: -32601, message: 'method not found' },
+          id: 1,
+        });
+      }),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      retry: { max: 5, baseDelayMs: 1 },
+    });
+    await expect(
+      client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
+    ).rejects.toBeInstanceOf(BtxRpcError);
+    expect(attempts).toBe(1);
+  });
+
+  it('does NOT retry on timeout (TimeoutError is final)', async () => {
+    let attempts = 0;
+    server.use(
+      http.post(RPC_URL, async () => {
+        attempts++;
+        await new Promise((r) => setTimeout(r, 200));
+        return HttpResponse.json({ result: stubChallenge, error: null, id: 1 });
+      }),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      timeoutMs: 50,
+      retry: { max: 5, baseDelayMs: 1 },
+    });
+    await expect(
+      client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
+    ).rejects.toBeInstanceOf(BtxTimeoutError);
+    expect(attempts).toBe(1);
+  });
+});

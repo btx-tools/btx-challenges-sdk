@@ -1,23 +1,35 @@
 # BTX challenges SDK — monorepo
 
-Workspace root for `@btx/challenges-sdk` and companion middleware packages.
+Workspace root for `@btx-tools/challenges-sdk` and companion middleware packages.
 
 ## Packages
 
-| Package | Description | Status |
+| Package | Description | Latest |
 |---|---|---|
-| [`@btx/challenges-sdk`](./packages/core) | Core RPC client + Solver (stubbed; ships Day 2) | Day 1 of 9 |
-| `@btx/challenges-sdk-express` | Express middleware adapter | Day 3 |
-| `@btx/challenges-sdk-fastify` | Fastify middleware adapter | Day 3 |
-| `@btx/challenges-sdk-hono` | Hono middleware adapter | Day 3 |
+| [`@btx-tools/challenges-sdk`](./packages/core) | Core RPC client + Solver (RPC + pure-JS modes) + algorithm port | **0.1.0** |
+| [`@btx-tools/middleware-express`](./packages/middleware-express) | Express middleware adapter | **0.2.1** |
+| [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter | **0.1.0** |
+| [`@btx-tools/middleware-hono`](./packages/middleware-hono) | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | **0.1.0** |
+
+Roadmap to `1.0.0`: see [`BTX/ecosystem/sdk-finishing-plan-2026-05-22.md`](../../Documents/BTX/ecosystem/sdk-finishing-plan-2026-05-22.md) (private).
 
 ## Quickstart (for SDK consumers)
 
 ```bash
-npm install @btx/challenges-sdk
+# Core only (RPC client + browser-compatible Solver)
+npm install @btx-tools/challenges-sdk
+
+# With an HTTP framework adapter — pick one
+npm install @btx-tools/challenges-sdk @btx-tools/middleware-express express
+npm install @btx-tools/challenges-sdk @btx-tools/middleware-fastify fastify
+npm install @btx-tools/challenges-sdk @btx-tools/middleware-hono hono
 ```
 
-Then see [packages/core/README.md](./packages/core/README.md).
+Then see the per-package README:
+- [packages/core/README.md](./packages/core/README.md)
+- [packages/middleware-express/README.md](./packages/middleware-express/README.md)
+- [packages/middleware-fastify/README.md](./packages/middleware-fastify/README.md)
+- [packages/middleware-hono/README.md](./packages/middleware-hono/README.md)
 
 ## Quickstart (for contributors)
 

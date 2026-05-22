@@ -1,6 +1,6 @@
 {
   "name": "@btx-tools/challenges-sdk",
-  "version": "0.0.4",
+  "version": "0.1.0",
   "description": "TypeScript SDK for BTX service challenges — chain-anchored proof-of-work admission control for APIs, agent gateways, and form submissions",
   "author": "visitor-code <visitor@friction.market>",
   "license": "MIT",
@@ -32,6 +32,7 @@
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
+    "test:perf": "vitest run tests/perf",
     "type-check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "prepublishOnly": "pnpm build"

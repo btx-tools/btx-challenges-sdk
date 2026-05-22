@@ -54,3 +54,13 @@ jobs:
         # locally, see packages/core/tests/integration/solve-redeem.test.ts for
         # the BTX_INTEGRATION_* gate variables.
         run: pnpm -r test:unit -- --reporter=verbose
+
+      - name: Perf regression gate (audit F-5)
+        # Core-only perf bench. Runs on Node 22 (latest in matrix) to keep the
+        # baseline consistent — earlier Node versions have different V8 JIT
+        # characteristics. Ceilings are generous (~5× local M-series baseline)
+        # to absorb GitHub Actions runner variance. Failures here indicate a
+        # ≥20% regression in the matmul hot loop or compression-coeff derivation;
+        # investigate before merging. See packages/core/tests/perf/bench.test.ts.
+        if: matrix.node-version == 22
+        run: pnpm --filter @btx-tools/challenges-sdk run test:perf

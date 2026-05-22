@@ -1,7 +1,7 @@
 {
-  "name": "@btx-tools/middleware-express",
-  "version": "0.2.1",
-  "description": "Express middleware for @btx-tools/challenges-sdk — drop-in BTX service-challenge admission gate",
+  "name": "@btx-tools/middleware-fastify",
+  "version": "0.1.0",
+  "description": "Fastify plugin for @btx-tools/challenges-sdk — drop-in BTX service-challenge admission gate",
   "author": "visitor-code <visitor@friction.market>",
   "license": "MIT",
   "type": "module",
@@ -36,25 +36,26 @@
     "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
-    "@btx-tools/challenges-sdk": "^0.0.1 || ^0.1.0",
-    "express": "^4.0.0 || ^5.0.0"
+    "@btx-tools/challenges-sdk": "^0.0.4 || ^0.1.0",
+    "fastify": "^4.0.0 || ^5.0.0"
+  },
+  "dependencies": {
+    "fastify-plugin": "^5.0.0"
   },
   "devDependencies": {
     "@btx-tools/challenges-sdk": "workspace:*",
-    "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
-    "@types/supertest": "^6.0.0",
-    "express": "^5.0.0",
+    "fastify": "^5.0.0",
     "prettier": "^3.3.0",
-    "supertest": "^7.0.0",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },
   "keywords": [
     "btx",
-    "express",
+    "fastify",
     "middleware",
+    "plugin",
     "admission",
     "rate-limit",
     "captcha",
@@ -65,9 +66,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/btx-tools/btx-challenges-sdk.git",
-    "directory": "packages/middleware-express"
+    "directory": "packages/middleware-fastify"
   },
-  "homepage": "https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/middleware-express#readme",
+  "homepage": "https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/middleware-fastify#readme",
   "bugs": {
     "url": "https://github.com/btx-tools/btx-challenges-sdk/issues"
   },
