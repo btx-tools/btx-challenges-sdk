@@ -88,7 +88,7 @@ Alternative: read `challenge` from the response BODY instead of the header (it's
 
 **Fix**: upgrade to `@btx-tools/challenges-sdk@^0.0.2` (or current 0.0.3). Confirm with `npm ls @btx-tools/challenges-sdk`.
 
-**Root cause #2** (still open as audit B-3 / risk 6 at 0.0.3): pure-JS proof shape was algorithm-cross-validated against btxd's pinned goldens (byte-equal) but the full live HTTP roundtrip was characterized in deferred test runs. **If you're hitting this in production on 0.0.3+ and the goldens pass**, you likely have a real bug — file an issue with `challenge_id` and we'll investigate.
+**Root cause #2** (✅ closed in [Unreleased] / 0.0.4 via live HTTP roundtrip against btx-node): pure-JS proof shape is now algorithm-cross-validated against btxd's pinned goldens (byte-equal, 0.0.1) AND the full live `issue → Solver.solve({ mode: 'pure-js' }) → client.redeem` lifecycle passes end-to-end (421 s, `valid: true`). **If you're hitting `digest_mismatch` on 0.0.4+** even after upgrading and confirming the goldens pass, file an issue with `challenge_id` immediately — it's a real bug, not a known surface gap.
 
 Memory ref: `reference_btx_challenges_sdk_repo` Day 2.5 byte-order fix.
 
@@ -224,8 +224,9 @@ The pure-JS suite takes ~1 hour wall-clock per case at floor difficulty (~770 ex
 
 | Entry | Audit ID | Retires when |
 |---|---|---|
-| digest-mismatch-byte-order (root cause #2) | B-3 / risk 6 | 0.0.4 ships the live-roundtrip closure validation |
 | client-no-retry | D-3 | 0.1.x ships retry/backoff |
 | client-no-per-method-timeout | D-4 | 0.1.x ships per-method `timeoutMs` |
+
+**B-3 (root cause #2 of digest-mismatch-byte-order) was previously listed here** — **closed in `[Unreleased]` / 0.0.4** via live-roundtrip lifecycle test against btx-node (paused mining, floor difficulty). Cookbook entry retained for historical context; no longer indicates an open risk.
 
 **D-1 (middleware no onError hook) was previously listed here** — **closed in `middleware-express@0.2.0`**. Use the `onError(err, req)` hook in `btxAdmission({ onError, ... })`. No workaround needed.

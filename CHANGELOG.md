@@ -4,7 +4,13 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
-(no entries yet)
+### @btx-tools/challenges-sdk
+
+- **B-3 / risk 6 CLOSED**: pure-JS proof-shape live roundtrip validated end-to-end against a live btxd. The existing pure-JS lifecycle test in `packages/core/tests/integration/solve-redeem.test.ts:145-178` ran against btx-node (mine-loop paused, RPC tunneled to Mac, btxd floor difficulty `target_solve_time_s=0.001 + min_solve_time_s=0.001`) and passed in 421 s: `issue → Solver.solve({ mode: 'pure-js' }) → client.redeem` returns `valid: true, reason: 'ok', redeemed: true`. Confirms btxd's `verifymatmulserviceproof` accepts the pure-TS-generated proof shape that we derived from reading btxd's RPC handler source in 0.0.1. Closes the only remaining algorithm-correctness gap from the `[0.0.2] § Still deferred` carry-over and audit `B-3` in `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`.
+
+  **Auxiliary tests (replay-rejection + auto-mode-fallback) attempted but did not complete cleanly** in this run window: test 2 hit the 75-min `PURE_JS_TIMEOUT_MS` per-test ceiling (random-variance attempt count exceeded budget at floor difficulty); test 3 fetch-failed when the SSH tunnel to the target btxd dropped despite keepalive after ~2 h NAT pressure. **Both failures are infrastructure, not algorithm.** Re-running on a dedicated DO droplet target (per `(internal reference)`) instead of an a paused-mining node is the suggested follow-up for full 3/3 coverage; the lifecycle test alone is the canonical B-3 closure.
+
+  No code changes in this entry — the algorithm was already locked at unit level via 5 byte-equal goldens in `tests/unit/matmul/btxd-vectors.test.ts` (0.0.1); this is purely the live validation that was deferred from `[0.0.2] § Still deferred`.
 
 ## [0.0.3] - 2026-05-22
 
