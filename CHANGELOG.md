@@ -4,6 +4,10 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
+(no entries yet)
+
+## [0.0.4] - 2026-05-23
+
 ### @btx-tools/challenges-sdk
 
 - **B-3 / risk 6 CLOSED**: pure-JS proof-shape live roundtrip validated end-to-end against a live btxd. The existing pure-JS lifecycle test in `packages/core/tests/integration/solve-redeem.test.ts:145-178` ran against btx-node (mine-loop paused, RPC tunneled to Mac, btxd floor difficulty `target_solve_time_s=0.001 + min_solve_time_s=0.001`) and passed in 421 s: `issue → Solver.solve({ mode: 'pure-js' }) → client.redeem` returns `valid: true, reason: 'ok', redeemed: true`. Confirms btxd's `verifymatmulserviceproof` accepts the pure-TS-generated proof shape that we derived from reading btxd's RPC handler source in 0.0.1. Closes the only remaining algorithm-correctness gap from the `[0.0.2] § Still deferred` carry-over and audit `B-3` in `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`.
