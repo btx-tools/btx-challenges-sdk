@@ -6,6 +6,30 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 (no entries yet)
 
+## [0.1.0] - 2026-05-23
+
+Phase 2 release per `BTX/ecosystem/sdk-finishing-plan-2026-05-22.md`. Adds two new framework adapters, closes the remaining 0.1.x audit items, and ships the perf-regression CI gate. Backward-compatible with `0.0.4`: existing consumers of `@btx-tools/challenges-sdk` need no code changes.
+
+### @btx-tools/challenges-sdk (0.0.4 → 0.1.0)
+
+- **D-4: per-method timeout** — new `methodTimeouts?: Record<string, number>` option on `BtxClientOpts`. Falls back to client-wide `timeoutMs`, then 30 s default. Useful for the `solvematmulservicechallenge` RPC which can take 15+ minutes on mining-loaded btxd ([[btxd-solver-mining-contention]]) vs ~50 ms for `getmatmulservicechallenge`. 4 new tests.
+- **D-3: retry/backoff** — new `retry?: RetryOptions` option on `BtxClientOpts`. Opt-in (default `{ max: 0 }`). Exponential backoff with optional jitter. Retries only on transient failures (`BtxNetworkError`, `BtxHttpError` ≥ 500); never on 4xx, JSON-RPC errors, parse errors, or timeouts. 6 new tests.
+- **F-5: perf-regression CI gate** — new `tests/perf/bench.test.ts` benchmarks `canonicalMatMul(n=64, b=8)` and `deriveCompressionVector(b=8)` against generous ceilings (~5× local M-series baseline) to absorb GitHub Actions runner variance. New `test:perf` script + CI step gated to Node 22 for baseline consistency.
+- `RetryOptions` interface exported from package root.
+- Test count: 142 → 152 unit + 2 perf bench.
+
+### @btx-tools/middleware-fastify (NEW: 0.1.0)
+
+First Fastify adapter. Mirrors the behavior of `@btx-tools/middleware-express` for Fastify's preHandler hook + reply API. See [`packages/middleware-fastify/CHANGELOG.md`](packages/middleware-fastify/CHANGELOG.md). 11 unit tests via Fastify's built-in `inject` (light-my-request).
+
+### @btx-tools/middleware-hono (NEW: 0.1.0)
+
+First Hono adapter. Works on Node, Deno, Bun, **Cloudflare Workers**, Vercel Edge, etc. Same stateless echo-the-challenge flow, ported to Hono's middleware model + `c.set('btx', ...)` variables. See [`packages/middleware-hono/CHANGELOG.md`](packages/middleware-hono/CHANGELOG.md). 11 unit tests via Hono's `app.request()` (Web fetch API).
+
+### @btx-tools/middleware-express (0.2.0 → 0.2.1)
+
+Peer-dep widening only. Now compatible with both `@btx-tools/challenges-sdk ^0.0.1` AND `^0.1.0`. No behavioral changes. Existing 0.2.0 installs continue to work unchanged.
+
 ## [0.0.4] - 2026-05-23
 
 ### @btx-tools/challenges-sdk

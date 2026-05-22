@@ -28,6 +28,7 @@ export {
   type ChallengePurpose,
   type DifficultyPolicy,
   type IssueParams,
+  type RetryOptions,
   type SolverOutput,
   type VerifyReason,
   type VerifyResult,

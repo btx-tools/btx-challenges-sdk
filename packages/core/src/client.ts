@@ -94,8 +94,56 @@ function nextRequestId(): string {
 export class BtxChallengeClient {
   constructor(private readonly opts: BtxClientOpts) {}
 
-  /** Low-level: raw JSON-RPC call. Exposed for forward compatibility. */
+  /**
+   * Low-level: raw JSON-RPC call. Exposed for forward compatibility.
+   *
+   * Honors {@link BtxClientOpts.methodTimeouts} (per-method override, audit D-4)
+   * and {@link BtxClientOpts.retry} (exponential backoff on transient failures,
+   * audit D-3). Both are opt-in via constructor options; default behavior is
+   * unchanged from 0.0.4 (30s single-attempt).
+   */
   async call<T = unknown>(method: string, params: unknown[] = []): Promise<T> {
+    const retry = this.opts.retry ?? { max: 0 };
+    const baseDelayMs = retry.baseDelayMs ?? 500;
+    let lastErr: unknown;
+
+    for (let attempt = 0; attempt <= retry.max; attempt++) {
+      if (attempt > 0) {
+        const delay = baseDelayMs * Math.pow(2, attempt - 1);
+        const jittered = retry.jitter ? delay + Math.random() * baseDelayMs : delay;
+        await new Promise((resolve) => setTimeout(resolve, jittered));
+      }
+      try {
+        return await this.callOnce<T>(method, params);
+      } catch (err) {
+        lastErr = err;
+        if (!this.isRetryable(err)) throw err;
+      }
+    }
+    throw lastErr;
+  }
+
+  /**
+   * Predicate: should this error trigger a retry?
+   *
+   * Retryable (transient):
+   *   - {@link BtxNetworkError} — DNS / TCP / TLS / connection drop
+   *   - {@link BtxHttpError} with status ≥ 500 — server overloaded / restarting
+   *
+   * NOT retryable (deterministic):
+   *   - {@link BtxTimeoutError} — caller's per-attempt budget exceeded; another attempt won't help
+   *   - {@link BtxRpcError} — btxd returned a structured JSON-RPC error envelope
+   *   - {@link BtxParseError} — body was non-JSON; will be non-JSON again
+   *   - {@link BtxHttpError} with status < 500 — 4xx is a client error
+   */
+  private isRetryable(err: unknown): boolean {
+    if (err instanceof BtxNetworkError) return true;
+    if (err instanceof BtxHttpError) return err.status >= 500;
+    return false;
+  }
+
+  /** Single attempt of the JSON-RPC call (no retry wrapping). */
+  private async callOnce<T>(method: string, params: unknown[]): Promise<T> {
     const id = nextRequestId();
     const auth = 'Basic ' + base64Utf8(`${this.opts.rpcAuth.user}:${this.opts.rpcAuth.pass}`);
     // JSON-RPC "1.0" is correct for Bitcoin-family btxd (NOT 2.0 as Ethereum-style uses).
@@ -103,7 +151,8 @@ export class BtxChallengeClient {
     const body = JSON.stringify({ jsonrpc: '1.0', id, method, params });
 
     const ctrl = new AbortController();
-    const timeoutMs = this.opts.timeoutMs ?? 30_000;
+    // D-4: per-method override → client-wide → 30s default
+    const timeoutMs = this.opts.methodTimeouts?.[method] ?? this.opts.timeoutMs ?? 30_000;
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
 
     let res: Response;

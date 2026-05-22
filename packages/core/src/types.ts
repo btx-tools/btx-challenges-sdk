@@ -194,6 +194,28 @@ export interface SolverOutput {
   proof: Record<string, unknown>;
 }
 
+/**
+ * Retry configuration for {@link BtxChallengeClient.call}.
+ *
+ * Default `{ max: 0 }` — opt-in. Retries fire only on transient failures:
+ * network errors (DNS/TCP/TLS) and 5xx HTTP responses. **Never** retries on
+ * 4xx HTTP, JSON-RPC error envelopes, parse errors, or timeouts — those are
+ * deterministic failures where another attempt won't help.
+ *
+ * Exponential backoff: delay between attempt N and N+1 is
+ * `baseDelayMs * 2^(N-1)`. With `jitter: true`, adds `random(0, baseDelayMs)`.
+ *
+ * Audit ref: D-3 in `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`.
+ */
+export interface RetryOptions {
+  /** Maximum number of retry attempts (in addition to the initial call). `0` disables retry. */
+  max: number;
+  /** Base delay in ms between attempts. Doubles each retry. Default 500. */
+  baseDelayMs?: number;
+  /** If `true`, adds `random(0, baseDelayMs)` of jitter to each delay. Default `false`. */
+  jitter?: boolean;
+}
+
 /** RPC client configuration. */
 export interface BtxClientOpts {
   /**
@@ -210,8 +232,26 @@ export interface BtxClientOpts {
     user: string;
     pass: string;
   };
-  /** Request timeout in ms (default 30000). */
+  /** Client-wide request timeout in ms (default 30000). Overridden per-method by {@link methodTimeouts}. */
   timeoutMs?: number;
+  /**
+   * Per-method timeout overrides (ms). Falls back to {@link timeoutMs}, then 30000.
+   *
+   * Useful because RPCs have very different time profiles: `solvematmulservicechallenge`
+   * on a mining-loaded btxd can take 15+ minutes ({@link https://github.com/btx-tools/btx-challenges-sdk see btxd-solver-mining-contention}),
+   * while `getmatmulservicechallenge` finishes in ~50 ms. Set
+   * `{ solvematmulservicechallenge: 1_000_000 }` to give the solver a long
+   * runway without bloating the client-wide default.
+   *
+   * Audit ref: D-4 in `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`.
+   */
+  methodTimeouts?: Record<string, number>;
+  /**
+   * Retry policy. Default `{ max: 0 }` (off). See {@link RetryOptions}.
+   *
+   * Audit ref: D-3 in `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`.
+   */
+  retry?: RetryOptions;
 }
 
 // ============================================================================
