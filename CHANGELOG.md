@@ -4,7 +4,18 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
-(no entries yet)
+### Added
+
+- **`examples/` directory** — three runnable adopter examples added at the workspace root, demonstrating the full BTX admission lifecycle end-to-end against a live btxd:
+  - `examples/01-basic-roundtrip` — Node script: `client.issue() → Solver.solve() → client.redeem()`, both pure-JS and RPC modes
+  - `examples/02-express-gate` — Express server gating `POST /v1/generate` with `btxAdmission`, plus a Node client that walks the 402→solve→200→403-replay flow
+  - `examples/03-browser-solver` — Vite browser page that drives the gated endpoint from a Web Worker, used as the perf-measurement vehicle for the WASM-or-defer decision on the matmul kernel
+- **`BROWSER-PERF-FINDINGS-2026-05-23.md`** — workspace-root findings doc recording browser solve wall-clock measurements (Chrome + Safari on M-series Mac) and the resulting WASM kernel decision
+- **`TROUBLESHOOTING.md`** — three new entries: `examples-need-service-challenge-rpcs`, `browser-pure-js-perf`, and `cors-x-btx-challenge-hidden`
+- **Workspace `pnpm-workspace.yaml`** — `examples/*` glob added so example workspaces resolve SDK packages via symlink
+- **Per-middleware READMEs** — cross-links to `examples/02-express-gate` (canonical pattern for all three adapters; per-adapter parity examples queued for Phase 3.5)
+
+No package version bumps — examples are not published to npm.
 
 ## [0.1.1] - 2026-05-23
 
