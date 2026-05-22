@@ -4,7 +4,23 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
-(no entries yet)
+### Added
+
+- **`examples/` directory** — three runnable adopter examples at workspace root:
+  - `examples/01-basic-roundtrip` — Node script: `client.issue() → Solver.solve() → client.redeem()`, RPC mode primary, pure-JS fallback
+  - `examples/02-express-gate` — Express server gating `POST /v1/generate` with `btxAdmission`, plus a Node client that walks the 402→solve→200→403-replay flow
+  - `examples/03-browser-solver` — Vite browser page **demonstrating the wire protocol** from a browser. **Reference only, not a production captcha** — see `USE-CASES.md`.
+- **`USE-CASES.md`** — workspace-root decision tree mapping deployment scenarios to recommended SDK modes. Required reading before integration. Explicitly carves out "browser captcha widget" as **not viable** with the current matmul proof primitive.
+- **`BROWSER-PERF-FINDINGS-2026-05-23.md`** — findings doc recording the WASM spike results (`~/code/btx-challenges-wasm/`, byte-equal cross-validation, 24.5× WASM speedup on the dot-product hot loop). Concludes: browser captcha at 1-4s is **not achievable** with the current proof — no combination of WASM + SIMD + multi-worker closes the ~1000× gap. Browser-friendly proof primitive is an upstream BTX protocol question, tracked separately.
+- **`TROUBLESHOOTING.md`** — three new entries: `examples-need-service-challenge-rpcs`, `browser-pure-js-perf`, and `cors-x-btx-challenge-hidden`
+- **Workspace `pnpm-workspace.yaml`** — `examples/*` glob added so example workspaces resolve SDK packages via symlink
+- **Per-middleware READMEs** — cross-links to `examples/02-express-gate`
+
+### Repositioning (important)
+
+The workspace README + `USE-CASES.md` reframe the SDK as **server-side admission middleware**. The 0.x and 1.0.0 releases serve adopters who run a btxd alongside their gate (`mode: 'rpc'` for sub-second solves). Browser-side solving is a reference implementation, not a captcha widget. This is a deliberate scope tightening based on the 2026-05-23 WASM spike measurement.
+
+No package version bumps — examples are not published to npm.
 
 ## [0.1.1] - 2026-05-23
 

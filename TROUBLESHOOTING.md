@@ -213,6 +213,74 @@ The pure-JS suite takes ~1 hour wall-clock per case at floor difficulty (~770 ex
 
 ---
 
+## examples-need-service-challenge-rpcs — `help: unknown command: getmatmulservicechallenge`
+
+**Symptom**: running any of the `examples/` against your own btxd fails with `help: unknown command: getmatmulservicechallenge` (or any of `solvematmulservicechallenge` / `verifymatmulserviceproof` / `redeemmatmulserviceproof`).
+
+**Root cause**: your btxd predates the service-challenge RPCs. They shipped in v0.30.1.
+
+**Fix**: upgrade btxd to ≥ v0.30.1. To confirm a candidate btxd has them:
+
+```bash
+btx-cli help getmatmulservicechallenge
+# present → "Returns ..."  (or an internal-bug-detected error from the help formatter;
+#                           the RPC itself still works)
+# missing → "help: unknown command: getmatmulservicechallenge"
+```
+
+If you can't upgrade your own btxd, point the example at a reachable one via SSH tunnel:
+
+```bash
+ssh -L 19334:127.0.0.1:19334 <host-with-newer-btxd>
+# then in another terminal, set BTX_RPC_URL=http://127.0.0.1:19334 and run
+```
+
+---
+
+## cors-x-btx-challenge-hidden — `402 received but X-BTX-Challenge header is absent`
+
+**Symptom**: a browser fetch to your gated endpoint succeeds with status 402 but `response.headers.get('x-btx-challenge')` returns `null`. The challenge envelope is unreadable from JS.
+
+**Root cause**: the `X-BTX-Challenge` header is a custom (non-CORS-safelisted) response header. Browsers hide custom response headers from JS unless the server includes them in `Access-Control-Expose-Headers`. This applies to all four BTX headers if you're hitting the gate from a cross-origin browser context.
+
+**Fix**: on the server, configure your CORS middleware to expose the BTX headers:
+
+```ts
+import cors from 'cors';
+
+app.use(cors({
+  origin: 'https://your-frontend.example',
+  allowedHeaders: [
+    'content-type',
+    'x-btx-challenge',
+    'x-btx-challenge-id',
+    'x-btx-proof-nonce',
+    'x-btx-proof-digest',
+  ],
+  exposedHeaders: ['x-btx-challenge'],
+}));
+```
+
+`allowedHeaders` lets the browser SEND the BTX headers (mandatory for the retry request); `exposedHeaders` lets the browser READ the `X-BTX-Challenge` response header from the 402.
+
+See `examples/02-express-gate/src/server.ts` for a working config + the [middleware-express README § CORS](packages/middleware-express/README.md#cors) for the full reference.
+
+---
+
+## browser-pure-js-perf — example 03 takes 7-10 min per solve
+
+**Symptom**: clicking "Run cycles" in `examples/03-browser-solver` shows the worker churning for 7-10 minutes before the row populates.
+
+**Root cause**: the pure-JS matmul kernel is BigInt-bound and several orders of magnitude slower than btxd's native solver. At BTX's floor difficulty (`target_solve_time_s: 0.001 + min_solve_time_s: 0.001`), a single browser solve takes ~7-10 min on an M-series Mac. Higher difficulty makes it strictly worse.
+
+**Fix**: there's no fix at the JS layer. Options:
+
+- Accept the wall-clock for low-traffic gates (e.g. one-shot form admission)
+- Move solving off the browser entirely (server-side worker pool, mobile app with native solver, etc.)
+- Wait for the WASM matmul kernel — decision + ETA tracked in [`BROWSER-PERF-FINDINGS-2026-05-23.md`](./BROWSER-PERF-FINDINGS-2026-05-23.md)
+
+---
+
 ## See also
 
 - [`QUICKSTART-CLAUDE-PACKET.md`](./QUICKSTART-CLAUDE-PACKET.md) — 30-min onboarding with these entries called out in each phase's Known-issues block
