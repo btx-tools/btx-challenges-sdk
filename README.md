@@ -11,7 +11,7 @@ Workspace root for `@btx-tools/challenges-sdk` and companion middleware packages
 | [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter | **0.1.0** |
 | [`@btx-tools/middleware-hono`](./packages/middleware-hono) | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | **0.1.0** |
 
-Roadmap to `1.0.0`: see [`BTX/ecosystem/sdk-finishing-plan-2026-05-22.md`](../../Documents/BTX/ecosystem/sdk-finishing-plan-2026-05-22.md) (private).
+Roadmap to `1.0.0`: operator-private — see internal `BTX/ecosystem/sdk-finishing-plan-2026-05-22.md`.
 
 ## Quickstart (for SDK consumers)
 

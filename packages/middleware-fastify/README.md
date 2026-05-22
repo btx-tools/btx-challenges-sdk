@@ -85,6 +85,29 @@ When `client.issue()` or `client.redeem()` throws (e.g., btxd RPC down, network 
 
 For HTTPS / production deployments, terminate TLS at a reverse proxy (Caddy, nginx, Cloudflare) in front of btxd. **Do NOT expose btxd's RPC port directly to the public internet.**
 
+## CORS
+
+The `X-BTX-Challenge`, `X-BTX-Proof-Nonce`, and `X-BTX-Proof-Digest` headers are **custom**, which triggers a CORS preflight for any browser-originated fetch. Configure `@fastify/cors`:
+
+```ts
+import cors from '@fastify/cors';
+await fastify.register(cors, {
+  origin: 'https://your-frontend.example',
+  allowedHeaders: [
+    'content-type',
+    'x-btx-challenge',
+    'x-btx-challenge-id',
+    'x-btx-proof-nonce',
+    'x-btx-proof-digest',
+  ],
+  exposedHeaders: [
+    'x-btx-challenge', // so the browser can READ the 402's challenge header
+  ],
+});
+```
+
+Without `exposedHeaders` including `x-btx-challenge`, the browser sees the 402 status but **cannot** read the challenge JSON from the response header.
+
 ## Requirements
 
 - **Node.js** ≥ 18.17

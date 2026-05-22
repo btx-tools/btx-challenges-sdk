@@ -6,6 +6,57 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 (no entries yet)
 
+## [0.1.1] - 2026-05-23
+
+Patch release addressing all findings from the **2026-05-23 deep audit** (see `BTX/audits/btx-challenges-sdk-audit-2026-05-23.md`). 3 HIGH + 7 MEDIUM + 5 LOW closed; 2 LOW deferred to `0.2.0` (additive API features); 4 findings explicitly declined with rationale.
+
+Backwards-compatible: no API removals, no signature changes. Recommended upgrade for all `0.1.0` consumers.
+
+### @btx-tools/challenges-sdk (0.1.0 → 0.1.1)
+
+#### Bug fixes
+- **H-1**: `retry.max` is now clamped via `Math.max(0, Math.floor(Number(retry.max) || 0))`. Previously, a negative or `NaN` `max` value caused the retry loop to skip entirely, throwing `undefined` (not a `BtxError`). Now the call always runs at least once and throws a real `BtxError` on failure.
+- **M-1**: `methodTimeouts[method] ≤ 0` and `timeoutMs ≤ 0` now fall through to the next layer (per-method → client-wide → 30 s default) instead of being treated as "instant abort." Previously, `methodTimeouts: { x: 0 }` would abort the request immediately on first tick, almost certainly not what the caller intended.
+- **M-2**: retry delay is now capped at `MAX_RETRY_DELAY_MS = 60_000` (60 s). Previously, a high `retry.max` with large `baseDelayMs` could schedule individual retry delays in the hours/days range.
+
+#### Documentation
+- **M-3**: inline comment on `Math.random()` jitter — non-security context (matches A-3 convention from the 2026-05-22 audit).
+- **M-1 + M-2**: JSDoc on `BtxClientOpts.timeoutMs` / `methodTimeouts` / `RetryOptions.max` / `RetryOptions.baseDelayMs` updated with new clamp + cap semantics.
+
+#### Tests
+- 6 new unit tests for the H-1, M-2, M-5, M-6 cases. Core test count: 152 → 158.
+
+#### Deferred to `0.2.0` (additive feature work)
+- **L-3**: `onRetry?: (attempt, err, nextDelayMs) => void` observability callback
+- **L-4**: semantic shortcut keys for `methodTimeouts` (e.g., `{ solve: ... }` in addition to raw RPC names)
+
+### @btx-tools/middleware-express (0.2.1 → 0.2.2)
+
+- **L-5**: new "CORS" subsection in README — explicit guidance on `allowedHeaders` + `exposedHeaders` for browser-originated fetches with the custom BTX headers.
+
+### @btx-tools/middleware-fastify (0.1.0 → 0.1.1)
+
+- **M-7**: inline comment on `headerValue` helper confirming first-occurrence selection on duplicate headers is intentional (matches standard proxy behavior).
+- **L-5**: new "CORS" subsection in README — `@fastify/cors` configuration.
+
+### @btx-tools/middleware-hono (0.1.0 → 0.1.1)
+
+- **H-2**: new "⚠️ Body consumption" subsection in README — explicit warning about Hono's one-shot `c.req.json()`, with concrete failure example + two safe patterns (cache-body-in-context, derive-from-headers).
+- **H-3**: rewrote "Edge-runtime notes" → adds new "Network reachability" subsection: explicit note that edge runtimes can't reach `127.0.0.1` and need Cloudflare Tunnel / public RPC proxy / public-IP relay. Per-runtime notes also tightened (no specific header-size number; cite "consult your platform's docs" instead).
+- **L-2**: removed inaccurate Vercel Edge "16 KB cap" claim — replaced with neutral "limits vary across edge platforms" guidance.
+- **L-5**: new "CORS" subsection in README — `hono/cors` configuration.
+
+### F-5 honesty pass (M-4)
+
+The F-5 gate added in `0.1.0` is a **ceiling gate**, not a true regression gate (no baseline tracking). This was implicit in the bench comments but not stated outright. The 2026-05-23 audit calls this out as M-4; CHANGELOG now records it explicitly. Upgrading to baseline-tracking (commit `tests/perf/baseline.json`, fail PR on >20 % drift) is queued for `0.1.2` or `0.2.0`.
+
+### Findings explicitly declined (with rationale, full detail in audit doc)
+
+- **M-8** middleware peer-floor tightness (`^0.0.4` instead of `^0.0.1`) — cosmetic; current range works
+- **M-9** source maps without source files in tarball — standard npm convention
+- **L-6** `as unknown as BtxChallengeClient` in test mocks — standard test idiom
+- **L-7** Middleware `kind` field validation — would BREAK on future btxd `kind` evolution; defensive validation is the wrong move
+
 ## [0.1.0] - 2026-05-23
 
 Phase 2 release per `BTX/ecosystem/sdk-finishing-plan-2026-05-22.md`. Adds two new framework adapters, closes the remaining 0.1.x audit items, and ships the perf-regression CI gate. Backward-compatible with `0.0.4`: existing consumers of `@btx-tools/challenges-sdk` need no code changes.

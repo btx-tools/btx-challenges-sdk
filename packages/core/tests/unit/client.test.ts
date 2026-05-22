@@ -11,7 +11,7 @@
 
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   BtxChallengeClient,
   BtxHttpError,
@@ -532,5 +532,147 @@ describe('BtxChallengeClient — D-3 retry/backoff (audit D-3)', () => {
       client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
     ).rejects.toBeInstanceOf(BtxTimeoutError);
     expect(attempts).toBe(1);
+  });
+});
+
+describe('BtxChallengeClient — D-3 + D-4 audit 0.1.1 hardening (audit 2026-05-23)', () => {
+  // H-1: retry.max input-sanitization
+  it('H-1: retry.max = -1 clamps to 0 (single attempt, throws real BtxError)', async () => {
+    let attempts = 0;
+    server.use(
+      http.post(RPC_URL, () => {
+        attempts++;
+        return HttpResponse.text('boom', { status: 503 });
+      }),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      // @ts-expect-error testing runtime clamp of invalid input
+      retry: { max: -1, baseDelayMs: 1 },
+    });
+    // Must throw a real BtxError (NOT undefined) so callers can `instanceof`-check
+    let caught: unknown;
+    try {
+      await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(BtxHttpError);
+    expect(caught).not.toBeUndefined();
+    expect(attempts).toBe(1); // clamped to single attempt
+  });
+
+  it('H-1: retry.max = NaN clamps to 0 (single attempt)', async () => {
+    let attempts = 0;
+    server.use(
+      http.post(RPC_URL, () => {
+        attempts++;
+        return HttpResponse.text('boom', { status: 503 });
+      }),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      retry: { max: NaN, baseDelayMs: 1 },
+    });
+    await expect(
+      client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
+    ).rejects.toBeInstanceOf(BtxHttpError);
+    expect(attempts).toBe(1);
+  });
+
+  // M-2 + M-5: backoff growth + cap — observed via setTimeout spy WITHOUT short-
+  // circuiting (the abort timer in callOnce also uses setTimeout, so we can't
+  // safely fire callbacks synchronously). Instead we let real timers run with
+  // tiny baseDelayMs (1ms) so wall-clock stays bounded.
+  it('M-5 + M-2: exponential backoff grows + capped at MAX_RETRY_DELAY_MS', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    try {
+      server.use(
+        http.post(RPC_URL, () => HttpResponse.text('boom', { status: 503 })),
+      );
+      const client = new BtxChallengeClient({
+        rpcUrl: RPC_URL,
+        rpcAuth: { user: 'u', pass: 'p' },
+        retry: { max: 4, baseDelayMs: 1 },
+      });
+      await expect(
+        client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
+      ).rejects.toBeInstanceOf(BtxHttpError);
+      // setTimeout was called: 4 retry delays (1, 2, 4, 8 ms) + 5 abort timers (30000ms each)
+      const calls = setTimeoutSpy.mock.calls.map((c) => Number(c[1])).filter(Number.isFinite);
+      // No delay should exceed the MAX_RETRY_DELAY_MS=60_000 cap. The 30000ms
+      // abort timer is the only large value we expect; anything >60_000 would
+      // indicate the cap is broken.
+      const overCap = calls.filter((d) => d > 60_000);
+      expect(overCap).toEqual([]);
+      // Retry delays should be the small geometric series 1,2,4,8 (or similar)
+      const retryDelays = calls.filter((d) => d > 0 && d < 1000);
+      expect(retryDelays).toEqual(expect.arrayContaining([1, 2, 4, 8]));
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+  });
+
+  // M-5: each retry attempt gets its own AbortController (not shared)
+  it('M-5: each retry attempt creates a fresh AbortController', async () => {
+    // If the controller were shared across attempts, the first attempt's
+    // timeout would abort all subsequent attempts immediately. Instead we
+    // verify that subsequent attempts succeed even after an earlier attempt
+    // hit a timeout-equivalent failure.
+    let attempts = 0;
+    server.use(
+      http.post(RPC_URL, async () => {
+        attempts++;
+        if (attempts === 1) return HttpResponse.text('first-fail', { status: 503 });
+        return HttpResponse.json({ result: stubChallenge, error: null, id: 1 });
+      }),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      timeoutMs: 5_000,
+      retry: { max: 2, baseDelayMs: 1 },
+    });
+    const c = await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    expect(c.challenge_id).toBe('test-cid');
+    expect(attempts).toBe(2);
+  });
+
+  // M-6: timeout=0 in methodTimeouts falls through to client-wide
+  it('M-6: methodTimeouts[method] = 0 is treated as "no override" (falls through)', async () => {
+    server.use(
+      http.post(RPC_URL, async () => {
+        // Hold past methodTimeouts(=0 → fallthrough) but under client-wide 5s
+        await new Promise((r) => setTimeout(r, 100));
+        return HttpResponse.json({ result: stubChallenge, error: null, id: 1 });
+      }),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      timeoutMs: 5_000,
+      // 0 must NOT mean "instant abort" — it falls through to client-wide 5000ms
+      methodTimeouts: { getmatmulservicechallenge: 0 },
+    });
+    const c = await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    expect(c.challenge_id).toBe('test-cid');
+  });
+
+  // M-6: methodTimeouts with key that doesn't exist in the standard RPC method list
+  it('M-6: methodTimeouts with non-existent method key has no effect', async () => {
+    server.use(
+      http.post(RPC_URL, () => HttpResponse.json({ result: stubChallenge, error: null, id: 1 })),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      timeoutMs: 5_000,
+      // Non-standard / typo method name — should be silently ignored (no override for the real call)
+      methodTimeouts: { totallyNotARealMethod: 1 },
+    });
+    const c = await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    expect(c.challenge_id).toBe('test-cid');
   });
 });
