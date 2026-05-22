@@ -1,5 +1,9 @@
 # 01-basic-roundtrip
 
+> **Production path: `mode: 'rpc'` against a dedicated non-mining btxd.** Sub-second solves. This is btx.dev's documented model.
+>
+> **The `mode: 'pure-js'` section below is a reference implementation.** It works against any reachable btxd including mining-loaded ones, but pure-JS BigInt arithmetic is ~24× slower than native WASM, ~3000× slower than native btxd. At BTX floor difficulty pure-JS takes ~7-60 min/solve in Node; at production difficulty it's hours. See [`../../USE-CASES.md`](../../USE-CASES.md).
+
 Minimal Node example showing the full BTX service-challenge lifecycle, end-to-end:
 
 ```

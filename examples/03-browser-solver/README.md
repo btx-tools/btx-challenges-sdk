@@ -1,8 +1,14 @@
 # 03-browser-solver
 
-Single-page Vite app that drives the BTX admission flow from the browser. Uses a Web Worker so the matmul proof-of-work runs off the main thread and the page stays responsive.
+> ## ⚠️ This is a wire-protocol demonstration, NOT a production captcha
+>
+> The pure-JS solver in this example takes **~7-60 minutes per attempt** at BTX's floor difficulty on an M-series Mac, and **~hours at production difficulty**. It is here to demonstrate that the issue → 402 → solve → 200 protocol works end-to-end from a browser, NOT to be deployed as a captcha widget.
+>
+> **Browser captcha is not currently a viable product with the BTX matmul proof.** Per our 2026-05-23 WASM spike (`~/code/btx-challenges-wasm/`), no combination of WASM + SIMD + multi-worker parallelism closes the 1000× gap to the 1-4s budget btx.dev recommends. See [`../../USE-CASES.md`](../../USE-CASES.md) and [`../../BROWSER-PERF-FINDINGS-2026-05-23.md`](../../BROWSER-PERF-FINDINGS-2026-05-23.md) for the full analysis.
+>
+> If you need a browser captcha: use hCaptcha, Cloudflare Turnstile, or Friendly Captcha. Watch for upstream BTX changes (new proof primitive) before adopting this for browser use.
 
-This example is the perf-measurement vehicle for deciding whether to ship a WASM matmul kernel — see [`../../BROWSER-PERF-FINDINGS-2026-05-23.md`](../../BROWSER-PERF-FINDINGS-2026-05-23.md).
+Single-page Vite app that drives the BTX admission flow from the browser. Uses a Web Worker so the matmul proof-of-work runs off the main thread and the page stays responsive.
 
 ## Prereqs
 
