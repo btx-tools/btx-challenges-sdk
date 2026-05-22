@@ -31,6 +31,24 @@ Then see the per-package README:
 - [packages/middleware-fastify/README.md](./packages/middleware-fastify/README.md)
 - [packages/middleware-hono/README.md](./packages/middleware-hono/README.md)
 
+## What this SDK is (and isn't)
+
+> **Read [USE-CASES.md](./USE-CASES.md) before deciding to integrate.** This SDK is **server-side admission middleware** for chain-anchored proof-of-work gating. It is **not** a browser captcha library — per our 2026-05-23 WASM spike, browser pure-JS solving is ~1000× over the 1-4s captcha UX budget at production difficulty. Use the `mode: 'rpc'` path against a dedicated non-mining btxd for production deployments.
+
+## Examples
+
+Three runnable end-to-end examples under [`examples/`](./examples/):
+
+| Path | Stack | What it shows | Status |
+|---|---|---|---|
+| [`examples/01-basic-roundtrip`](./examples/01-basic-roundtrip) | Node + tsx | Minimal `issue → Solver.solve → redeem` walk-through, both pure-JS and RPC modes | ✅ Adopter-ready (server-side) |
+| [`examples/02-express-gate`](./examples/02-express-gate) | Node + Express + tsx | Full Express server with `btxAdmission` on `POST /v1/generate`, plus a Node client driving the 402 → solve → 200 → 403-replay flow | ✅ Adopter-ready (server-side) |
+| [`examples/03-browser-solver`](./examples/03-browser-solver) | Vite + TypeScript + Web Worker | **Demonstrates the wire protocol** from a browser. **NOT a production captcha** — see [USE-CASES.md](./USE-CASES.md). | ⚠️ Reference only |
+
+Each `examples/<n>/README.md` has install + run instructions.
+
+> Heads-up: at floor difficulty, a pure-JS solve takes ~7-60 min wall-clock on an M-series Mac (BigInt-bound). Use `mode: 'rpc'` against a dedicated non-mining btxd for sub-second production solves.
+
 ## Quickstart (for contributors)
 
 ```bash
