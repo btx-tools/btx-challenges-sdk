@@ -4,6 +4,13 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
+## 2026-05-23 — docs clarity pass (core → `1.0.2`, middleware-\* → `1.0.1`)
+
+Docs-only across the family; no code or API change. Republished so the npm package pages carry the clarity.
+
+- **`@btx-tools/challenges-sdk` (1.0.1 → 1.0.2)** — added a **"Prerequisites: you need a BTX node"** section: this SDK requires a reachable `btxd` (non-mining for ~1–4 s solves), there is no hosted/public endpoint, and pure-JS solving is minutes-to-hours at production difficulty. Makes the node requirement explicit up front.
+- **`@btx-tools/middleware-express` (1.0.0 → 1.0.1), `-fastify` (1.0.0 → 1.0.1), `-hono` (1.0.0 → 1.0.1)** — each adapter README gained a "New to BTX service challenges?" intro + a Prerequisites note (linking to the core README), so each npm page is self-explanatory. Fixed a stale `middleware-express` Status line (was "0.2.0 / peer ^0.0.1"); hono notes the edge-runtime `127.0.0.1` reachability caveat.
+
 ## [1.0.1] - 2026-05-23 — `@btx-tools/challenges-sdk` (docs only)
 
 README rewrite for npm-page clarity — **no code, no API change.** Republished so the improved README reaches the npm package page.

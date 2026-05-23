@@ -73,12 +73,12 @@ app.post(
 
 This repo is a monorepo: the core SDK plus three framework adapters (install only the ones you need).
 
-| Package                                                          | Description                                                          | Latest    |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------- | --------- |
-| [`@btx-tools/challenges-sdk`](./packages/core)                   | Core RPC client + Solver (RPC + pure-JS modes) + algorithm port      | **1.0.1** |
-| [`@btx-tools/middleware-express`](./packages/middleware-express) | Express middleware adapter                                           | **1.0.0** |
-| [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter                                               | **1.0.0** |
-| [`@btx-tools/middleware-hono`](./packages/middleware-hono)       | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | **1.0.0** |
+| Package                                                          | Description                                                          | npm                                                                                                                               |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| [`@btx-tools/challenges-sdk`](./packages/core)                   | Core RPC client + Solver (RPC + pure-JS modes) + algorithm port      | [![npm](https://img.shields.io/npm/v/@btx-tools/challenges-sdk)](https://www.npmjs.com/package/@btx-tools/challenges-sdk)         |
+| [`@btx-tools/middleware-express`](./packages/middleware-express) | Express middleware adapter                                           | [![npm](https://img.shields.io/npm/v/@btx-tools/middleware-express)](https://www.npmjs.com/package/@btx-tools/middleware-express) |
+| [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter                                               | [![npm](https://img.shields.io/npm/v/@btx-tools/middleware-fastify)](https://www.npmjs.com/package/@btx-tools/middleware-fastify) |
+| [`@btx-tools/middleware-hono`](./packages/middleware-hono)       | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | [![npm](https://img.shields.io/npm/v/@btx-tools/middleware-hono)](https://www.npmjs.com/package/@btx-tools/middleware-hono)       |
 
 ### Sibling packages (separate repos)
 

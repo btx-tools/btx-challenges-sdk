@@ -7,7 +7,11 @@ Drop-in Express admission gate backed by [BTX](https://btx.dev) service challeng
 
 📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** — TypeDoc for all `@btx-tools/*` SDK packages.
 
-> **Status**: 0.2.0. Requires `@btx-tools/challenges-sdk@^0.0.1`. **Breaking change from 0.1.x**: `Express.Request.btxResult` was renamed to `req.btx.result` (see [CHANGELOG](./CHANGELOG.md#020---2026-05-22) for migration).
+> **New to BTX service challenges?** This puts a chain-anchored proof-of-work checkpoint in front of a route — the caller spends a few seconds of _verifiable compute_ instead of a CAPTCHA or a signup. Concept + `issue → solve → redeem` flow: see the [core SDK README](https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/core#what-is-this).
+>
+> **Prerequisites:** you need a reachable **BTX node (`btxd`)** — non-mining for fast (~1–4 s) solves; there's no hosted endpoint, so you can't use this with zero BTX infrastructure. See [core → Prerequisites](https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/core#prerequisites-you-need-a-btx-node).
+
+> **Status**: 🟢 `1.0.0` — stable, peer `@btx-tools/challenges-sdk@^1.0.0`. The result is exposed as `req.btx.result` (if upgrading from `0.1.x`, this was renamed from the old flat `req.btxResult`).
 
 > **End-to-end example**: clone the repo and run [`examples/02-express-gate`](https://github.com/btx-tools/btx-challenges-sdk/tree/main/examples/02-express-gate) for a working server + client pair you can copy from. Walks the full 402 → solve → 200 → 403-replay flow against a live btxd.
 

@@ -38,6 +38,16 @@ The [middleware packages](#drop-in-middleware) run this whole handshake for you,
 - 📝 **Anonymous form / submission** rate-limiting without accounts
 - 🚦 Replace hCaptcha / reCAPTCHA with **self-hosted, chain-anchored** proof — on the server side
 
+## Prerequisites: you need a BTX node
+
+This SDK talks to a **BTX full node (`btxd`)** over JSON-RPC. It does **not** bundle or call any hosted service, and there is **no public/shared endpoint** — a project with zero BTX infrastructure can't just `npm install` and start gating traffic. You (or someone) must run a `btxd` you can reach:
+
+- **The gate (your server)** calls `issue` / `verify` / `redeem` against `btxd` — lightweight, fast RPCs.
+- **Solving a challenge fast (~1–4 s)** uses `btxd`'s `solvematmulservicechallenge` on a node that is **NOT mining** — on a mining node it queues behind block work and can take **15+ minutes**. A ~$5/mo VPS running `btxd` with `gen=0` is enough.
+- **Pure-JS solving** (the browser-compatible `Solver`) needs no node, but is **minutes-to-hours** at production difficulty — practical only for low/calibrated difficulty or non-interactive (cron/batch) flows. See [Performance](#performance).
+
+Minimal setup from zero: run a `btxd` full node (sync the chain, set `rpcauth`, expose RPC over TLS or bind to `127.0.0.1`), then point `rpcUrl` / `rpcAuth` at it. There's deliberately no centralized solver service — that would defeat the proof's attacker-vs-defender asymmetry.
+
 ## Install
 
 ```bash

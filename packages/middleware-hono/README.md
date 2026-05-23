@@ -4,6 +4,10 @@ Drop-in **Hono** admission gate backed by BTX service challenges. Works on Node,
 
 📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** — TypeDoc for all `@btx-tools/*` SDK packages.
 
+> **New to BTX service challenges?** This puts a chain-anchored proof-of-work checkpoint in front of a route — the caller spends a few seconds of _verifiable compute_ instead of a CAPTCHA or a signup. Concept + `issue → solve → redeem` flow: see the [core SDK README](https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/core#what-is-this).
+>
+> **Prerequisites:** you need a reachable **BTX node (`btxd`)** — non-mining for fast (~1–4 s) solves; there's no hosted endpoint, so you can't use this with zero BTX infrastructure. (Edge note: a Worker/edge runtime can't reach `127.0.0.1` — point at a public/tunnelled `btxd`.) See [core → Prerequisites](https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/core#prerequisites-you-need-a-btx-node).
+
 > **End-to-end example**: a runnable adopter example is in [`examples/02-express-gate`](https://github.com/btx-tools/btx-challenges-sdk/tree/main/examples/02-express-gate) (Express-based; the wiring shape is structurally identical for Hono — swap the route + middleware call). A Hono-native parity example covering both Node and edge deploy is queued for the SDK Phase 3.5 roadmap.
 
 ```bash
