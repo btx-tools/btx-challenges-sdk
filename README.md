@@ -75,7 +75,7 @@ This repo is a monorepo: the core SDK plus three framework adapters (install onl
 
 | Package                                                          | Description                                                          | Latest    |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------- | --------- |
-| [`@btx-tools/challenges-sdk`](./packages/core)                   | Core RPC client + Solver (RPC + pure-JS modes) + algorithm port      | **1.0.0** |
+| [`@btx-tools/challenges-sdk`](./packages/core)                   | Core RPC client + Solver (RPC + pure-JS modes) + algorithm port      | **1.0.1** |
 | [`@btx-tools/middleware-express`](./packages/middleware-express) | Express middleware adapter                                           | **1.0.0** |
 | [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter                                               | **1.0.0** |
 | [`@btx-tools/middleware-hono`](./packages/middleware-hono)       | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | **1.0.0** |

@@ -3,24 +3,40 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/@btx-tools/challenges-sdk)](https://www.npmjs.com/package/@btx-tools/challenges-sdk)
 
-TypeScript SDK for **BTX service challenges** — chain-anchored proof-of-work admission control for APIs, agent gateways, and form submissions.
+> **Put a proof-of-work checkpoint in front of any endpoint — no CAPTCHA, no login, no API keys, no third-party service.**
 
-📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** — full TypeDoc for this package and the middleware adapters.
+Your server asks a caller to burn a few seconds of _verifiable_ compute before you do something expensive or abusable. The work is a domain-bound MatMul proof defined and checked by the **[BTX](https://btx.dev)** chain — so there's no centralized issuer to trust, and a proof can't be replayed.
 
-> **Status**: 🟢 **`1.0.0` — stable** (API frozen under SemVer). RPC + pure-JS solver cross-validated byte-equal against btxd's own pinned test vectors; opt-in retry/backoff (`onRetry` hook) + per-method timeouts (raw or semantic keys) + `AbortSignal` plumbing. All audit findings closed. See [CHANGELOG](https://github.com/btx-tools/btx-challenges-sdk/blob/main/CHANGELOG.md).
+📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** · 🟢 **Stable `1.0.0`** (API frozen under [SemVer](https://semver.org/)). RPC + pure-JS solver cross-validated byte-equal against btxd's own pinned test vectors; opt-in retry/backoff (`onRetry`), per-method timeouts, `AbortSignal` plumbing. All audit findings closed. [CHANGELOG](https://github.com/btx-tools/btx-challenges-sdk/blob/main/CHANGELOG.md).
 
 ## What is this?
 
-[BTX](https://btx.dev) is a post-quantum settlement chain that exposes a unique admission-control primitive: domain-bound MatMul work proofs that you can use to gate any HTTP endpoint, MCP tool call, or anonymous form submission.
+### Why use it
 
-Issue a challenge → client solves a ~1–4 second matrix-multiplication puzzle → server redeems the proof atomically (no replays). The work is anchored to the BTX chain — tamper-proof, no centralized issuer needed.
+Slowing down bots / scraping / spam usually means a **CAPTCHA** (annoys real users, increasingly bot-solved), **accounts / API keys** (signup friction + a user database), or a **hosted anti-bot service** (a third party, a bill, a privacy trade-off). A BTX service challenge instead makes the _caller_ prove they spent a little real compute — **cheap to verify, costly to spam at scale, anchored to a public chain, and fully self-hosted.**
 
-**Use cases**:
+### How it works — issue → solve → redeem
 
-- 🤖 Gate AI inference APIs without a CAPTCHA
-- 🛡️ Per-tool-call proof-of-work for MCP / agent gateways
-- 📝 Anonymous form submission rate-limiting
-- 🚦 Replace hCaptcha / reCAPTCHA with chain-anchored proof
+```
+Client ── POST /expensive ─────────────────▶  Server
+                                               │  no proof yet → issue a challenge
+Client ◀── 402 Payment Required ───────────────┤  (challenge rides in the X-BTX-Challenge header)
+   │  solve the matmul work-proof
+   │  (server-side via a nearby NON-mining btxd RPC → ~1–4 s; see Performance)
+   ▼
+Client ── POST /expensive + proof headers ──▶  Server
+                                               │  redeem: verify + consume (anti-replay)
+Client ◀── 200 OK — your handler runs ─────────┘
+```
+
+The [middleware packages](#drop-in-middleware) run this whole handshake for you, with no server-side challenge store (the challenge echoes back in a header on retry).
+
+### Use cases
+
+- 🤖 Gate **AI / inference APIs** without a CAPTCHA or login wall
+- 🛡️ Per-tool-call proof-of-work for **MCP / agent gateways** (see [`@btx-tools/mcp-gateway`](https://github.com/btx-tools/btx-mcp-gateway))
+- 📝 **Anonymous form / submission** rate-limiting without accounts
+- 🚦 Replace hCaptcha / reCAPTCHA with **self-hosted, chain-anchored** proof — on the server side
 
 ## Install
 
@@ -149,7 +165,7 @@ The pure-JS solver is a direct port of the canonical CPU path from `btxd v0.29.7
 - `canonicalMatMul(n=8, b=4)` transcript_hash — `canonical_matmul_n8_b4_pinned_transcript`
 - Live `deriveSigma` (2 nonces) — `verifymatmulserviceproof.proof.sigma` from a real btxd
 
-Plus 125 internal unit tests covering field arithmetic, matrix ops, header serialization, and solver dispatch.
+Plus 170+ internal unit tests covering field arithmetic, matrix ops, header serialization, retry/timeout/abort behavior, and solver dispatch.
 
 #### ⚠️ Deployment note — RPC mode against a mining btxd
 
@@ -185,7 +201,7 @@ Expected end-to-end solve time depends on challenge difficulty. At btxd's lowest
 - Backend cron / batch jobs
 - Examples + demos with manually-issued low-difficulty challenges
 
-Day 2.6 will add a WASM port of the matmul kernel + the `field.mul`/`field.dot` hot loops, targeting a 10× speed-up.
+> **A WASM kernel won't rescue browser solving.** A 2026-05-23 spike measured a Rust/WASM port of the matmul hot loop at ~24.5× over pure-JS BigInt — but even a full WASM + SIMD + multi-worker stack lands ~1 hour at production difficulty, ~1000× over a 1–4 s captcha budget. The matmul proof is shaped for GPU-fast native mining, not the browser. **For production, solve server-side via `mode: 'rpc'` against a nearby non-mining btxd (~1–4 s).** Browser pure-JS remains reference-only. See [`USE-CASES.md`](https://github.com/btx-tools/btx-challenges-sdk/blob/main/USE-CASES.md).
 
 Reproduce the bench:
 
@@ -225,22 +241,13 @@ app.post(
 
 That's it — one line, your route is gated by a BTX service challenge. Full docs at [`@btx-tools/middleware-express`](https://www.npmjs.com/package/@btx-tools/middleware-express) or in the [package README](https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/middleware-express#readme).
 
-Fastify + Hono adapters queued as `@btx-tools/middleware-fastify` + `@btx-tools/middleware-hono`.
+Also available: [`@btx-tools/middleware-fastify`](https://www.npmjs.com/package/@btx-tools/middleware-fastify) (Fastify plugin) and [`@btx-tools/middleware-hono`](https://www.npmjs.com/package/@btx-tools/middleware-hono) (Hono — Node + edge: Cloudflare Workers, Deno, Bun). Same `btxAdmission` shape across all three.
 
-## Roadmap
+## Status & roadmap
 
-| Status | Item                                                                        |
-| ------ | --------------------------------------------------------------------------- |
-| ✅     | Day 1: RPC client + types + audit Wave A/B/C fixes                          |
-| ✅     | Day 2: Solver class with mode dispatch (RPC mode ships)                     |
-| ✅     | Day 2.5: Pure-JS MatMul solver port, cross-validated against btxd goldens   |
-| ✅     | Day 3 (partial): Express middleware → `@btx-tools/middleware-express@0.1.0` |
-| ⏳     | Day 2.6: WASM port of matmul kernel (perf)                                  |
-| ⏳     | Day 3 (rest): Fastify + Hono adapters (separate sub-packages)               |
-| ⏳     | Day 4: Browser demo + Node examples                                         |
-| ⏳     | Day 5-6: `@btx-tools/mcp-gateway` companion package                         |
-| ⏳     | Day 7-8: Docs + announce                                                    |
-| ⏳     | Day 9: Findings + handoff                                                   |
+**Shipped & stable at `1.0.0`** — RPC client + Solver (rpc + pure-JS), pure-JS matmul port cross-validated against btxd goldens, retry/backoff + per-method timeouts + AbortSignal, Express/Fastify/Hono adapters, the [`@btx-tools/mcp-gateway`](https://github.com/btx-tools/btx-mcp-gateway) companion, runnable [examples](https://github.com/btx-tools/btx-challenges-sdk/tree/main/examples), and a published [API reference](https://btx-tools.github.io/btx-challenges-sdk/). Two deep audits closed every finding.
+
+Post-1.0 candidates (additive, non-breaking) — Cloudflare Worker template, WordPress plugin, Python SDK, LangChain bindings — are listed in the [monorepo README](https://github.com/btx-tools/btx-challenges-sdk#post-10-roadmap).
 
 ## Testing
 

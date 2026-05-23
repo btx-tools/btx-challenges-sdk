@@ -4,6 +4,16 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-05-23 — `@btx-tools/challenges-sdk` (docs only)
+
+README rewrite for npm-page clarity — **no code, no API change.** Republished so the improved README reaches the npm package page.
+
+- New "What is this?" intro: the problem (vs CAPTCHA / accounts / hosted anti-bot), an `issue → solve → redeem` ASCII flow diagram, and use cases — mirrors the monorepo README.
+- Removed stale claims that misrepresented shipped state: the "Day 2.6 WASM kernel coming (10×)" line (the WASM spike concluded browser solving isn't viable — solve server-side via `rpc`), "Fastify + Hono adapters queued" (both shipped + stable), and the day-by-day roadmap table (replaced with a "shipped & stable at 1.0.0" status + post-1.0 pointer).
+- Test-count + perf framing refreshed.
+
+(Other packages unchanged at `1.0.0`; core peer range on middleware is `^1.0.0`, so `1.0.1` is in-range.)
+
 ## [1.0.0] - 2026-05-23
 
 **Stable API freeze.** All four `@btx-tools/*` SDK packages move to `1.0.0` together. The public API is now under [SemVer](https://semver.org/) — breaking changes require a `2.0.0`. **No code changes from `0.3.1`/`0.2.3`/`0.1.2`** — this release promotes the existing, audit-clean surface to a stability commitment.
