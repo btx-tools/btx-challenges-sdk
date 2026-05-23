@@ -2,6 +2,8 @@
 
 Drop-in **Hono** admission gate backed by BTX service challenges. Works on Node, Deno, Bun, **Cloudflare Workers**, and other edge runtimes Hono targets. Same flow + ergonomics as [`@btx-tools/middleware-express`](https://www.npmjs.com/package/@btx-tools/middleware-express) and [`@btx-tools/middleware-fastify`](https://www.npmjs.com/package/@btx-tools/middleware-fastify), tailored to Hono's middleware model + `c.set('btx', ...)` variables.
 
+📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** — TypeDoc for all `@btx-tools/*` SDK packages.
+
 > **End-to-end example**: a runnable adopter example is in [`examples/02-express-gate`](../../examples/02-express-gate) (Express-based; the wiring shape is structurally identical for Hono — swap the route + middleware call). A Hono-native parity example covering both Node and edge deploy is queued for the SDK Phase 3.5 roadmap.
 
 ```bash
@@ -22,7 +24,8 @@ const client = new BtxChallengeClient({
 
 const app = new Hono<{ Variables: BtxAdmissionVariables }>();
 
-app.post('/v1/generate',
+app.post(
+  '/v1/generate',
   btxAdmission({
     client,
     purpose: 'ai_inference_gate',
@@ -45,15 +48,16 @@ export default app;
 Hono's `c.req.json()` is **one-shot** — once consumed, the body stream is gone. If your `resource` / `subject` resolver does `await c.req.json()`, the route handler downstream **cannot read the body again** and will throw `BodyAlreadyUsedError`.
 
 ❌ **This breaks**:
+
 ```ts
-btxAdmission({
+(btxAdmission({
   // ...
   resource: async (c) => `model:${(await c.req.json()).model}`,
 }),
-async (c) => {
-  const body = await c.req.json(); // ← throws — body already consumed!
-  return c.json({ ok: true });
-}
+  async (c) => {
+    const body = await c.req.json(); // ← throws — body already consumed!
+    return c.json({ ok: true });
+  });
 ```
 
 ✅ **Two safe patterns**:
@@ -100,16 +104,16 @@ Returns a Hono middleware function to attach per-route.
 
 #### Options
 
-| Field | Type | Notes |
-|---|---|---|
-| `client` | `BtxChallengeClient` | required. Construct once at boot. |
-| `purpose` | `string \| (c) => string \| (c) => Promise<string>` | required. Logical purpose label. Async resolver supported so you can `await c.req.json()`. |
-| `resource` | `string \| (c) => string \| (c) => Promise<string>` | required. |
-| `subject` | `string \| (c) => string \| (c) => Promise<string>` | required. |
-| `issueParams` | `Partial<IssueParams>` | optional. |
-| `onAdmit` | `(c, result) => void` | optional. Fires on successful admission. |
-| `onError` | `(err, c) => void` | optional. Fires when `client.issue()` or `client.redeem()` throws. Re-thrown to Hono's `onError`. Audit ref: D-1. |
-| `isProofPresent` | `(c) => boolean` | optional. Predicate override. |
+| Field            | Type                                                | Notes                                                                                                             |
+| ---------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `client`         | `BtxChallengeClient`                                | required. Construct once at boot.                                                                                 |
+| `purpose`        | `string \| (c) => string \| (c) => Promise<string>` | required. Logical purpose label. Async resolver supported so you can `await c.req.json()`.                        |
+| `resource`       | `string \| (c) => string \| (c) => Promise<string>` | required.                                                                                                         |
+| `subject`        | `string \| (c) => string \| (c) => Promise<string>` | required.                                                                                                         |
+| `issueParams`    | `Partial<IssueParams>`                              | optional.                                                                                                         |
+| `onAdmit`        | `(c, result) => void`                               | optional. Fires on successful admission.                                                                          |
+| `onError`        | `(err, c) => void`                                  | optional. Fires when `client.issue()` or `client.redeem()` throws. Re-thrown to Hono's `onError`. Audit ref: D-1. |
+| `isProofPresent` | `(c) => boolean`                                    | optional. Predicate override.                                                                                     |
 
 ### `BtxAdmissionVariables`
 
@@ -123,16 +127,17 @@ After admission, `c.get('btx')` is `{ result: VerifyResult } | undefined`.
 
 ### Header constants
 
-| Constant | Value |
-|---|---|
-| `HEADER_CHALLENGE` | `'x-btx-challenge'` |
+| Constant              | Value                  |
+| --------------------- | ---------------------- |
+| `HEADER_CHALLENGE`    | `'x-btx-challenge'`    |
 | `HEADER_CHALLENGE_ID` | `'x-btx-challenge-id'` |
-| `HEADER_PROOF_NONCE` | `'x-btx-proof-nonce'` |
+| `HEADER_PROOF_NONCE`  | `'x-btx-proof-nonce'`  |
 | `HEADER_PROOF_DIGEST` | `'x-btx-proof-digest'` |
 
 ## Error handling
 
 When `client.issue()` or `client.redeem()` throws (e.g., btxd RPC down, network error), the middleware:
+
 1. Calls `opts.onError(err, c)` if provided
 2. Re-throws — Hono's `app.onError()` handler kicks in
 
@@ -170,19 +175,22 @@ The `X-BTX-Challenge`, `X-BTX-Proof-Nonce`, and `X-BTX-Proof-Digest` headers are
 
 ```ts
 import { cors } from 'hono/cors';
-app.use('/v1/*', cors({
-  origin: 'https://your-frontend.example',
-  allowHeaders: [
-    'content-type',
-    'x-btx-challenge',
-    'x-btx-challenge-id',
-    'x-btx-proof-nonce',
-    'x-btx-proof-digest',
-  ],
-  exposeHeaders: [
-    'x-btx-challenge', // so the browser can READ the 402's challenge header
-  ],
-}));
+app.use(
+  '/v1/*',
+  cors({
+    origin: 'https://your-frontend.example',
+    allowHeaders: [
+      'content-type',
+      'x-btx-challenge',
+      'x-btx-challenge-id',
+      'x-btx-proof-nonce',
+      'x-btx-proof-digest',
+    ],
+    exposeHeaders: [
+      'x-btx-challenge', // so the browser can READ the 402's challenge header
+    ],
+  }),
+);
 ```
 
 Without `exposeHeaders` including `x-btx-challenge`, the browser sees the 402 status but **cannot** read the challenge JSON from the response header (Web Fetch hides non-CORS-safelisted response headers by default).

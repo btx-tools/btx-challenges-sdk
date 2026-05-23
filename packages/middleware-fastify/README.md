@@ -2,6 +2,8 @@
 
 Drop-in **Fastify** admission gate backed by BTX service challenges. Same flow + ergonomics as [`@btx-tools/middleware-express`](https://www.npmjs.com/package/@btx-tools/middleware-express), tailored to Fastify's preHandler hook + reply API.
 
+📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** — TypeDoc for all `@btx-tools/*` SDK packages.
+
 > **End-to-end example**: a runnable adopter example is in [`examples/02-express-gate`](../../examples/02-express-gate) (Express-based; the wiring shape is identical for Fastify — swap `app.post(path, btxAdmission(...))` for `fastify.post(path, { preHandler: btxAdmission(...) })`). A Fastify-native parity example is queued for the SDK Phase 3.5 roadmap.
 
 ```bash
@@ -22,19 +24,23 @@ const client = new BtxChallengeClient({
 
 const fastify = Fastify();
 
-fastify.post('/v1/generate', {
-  preHandler: btxAdmission({
-    client,
-    purpose: 'ai_inference_gate',
-    resource: (req) => `model:${(req.body as any).model}|route:${req.url}`,
-    subject: (req) => `tenant:${(req.body as any).tenant_id}`,
-    issueParams: { target_solve_time_s: 1.0, expires_in_s: 60 },
-    onError: (err, req) => req.log.error({ err }, 'btx admission error'),
-  }),
-}, async (request, reply) => {
-  // request.btx?.result is populated with the redeem VerifyResult
-  return { ok: true, generated: '...' };
-});
+fastify.post(
+  '/v1/generate',
+  {
+    preHandler: btxAdmission({
+      client,
+      purpose: 'ai_inference_gate',
+      resource: (req) => `model:${(req.body as any).model}|route:${req.url}`,
+      subject: (req) => `tenant:${(req.body as any).tenant_id}`,
+      issueParams: { target_solve_time_s: 1.0, expires_in_s: 60 },
+      onError: (err, req) => req.log.error({ err }, 'btx admission error'),
+    }),
+  },
+  async (request, reply) => {
+    // request.btx?.result is populated with the redeem VerifyResult
+    return { ok: true, generated: '...' };
+  },
+);
 
 await fastify.listen({ port: 3000 });
 ```
@@ -57,24 +63,24 @@ Returns a Fastify preHandler hook to attach per-route.
 
 #### Options
 
-| Field | Type | Notes |
-|---|---|---|
-| `client` | `BtxChallengeClient` | required. Construct once at boot. |
-| `purpose` | `string \| (req) => string` | required. Logical purpose label. |
-| `resource` | `string \| (req) => string` | required. Resource identifier. |
-| `subject` | `string \| (req) => string` | required. Subject identifier. |
-| `issueParams` | `Partial<IssueParams>` | optional. Extra params forwarded to `client.issue()`. |
-| `onAdmit` | `(req, result) => void` | optional. Fires on successful admission. |
-| `onError` | `(err, req) => void` | optional. Fires when `client.issue()` or `client.redeem()` throws, exactly once before the preHandler re-throws. Use for logging. Audit ref: D-1. |
-| `isProofPresent` | `(req) => boolean` | optional. Override the default `headers[x-btx-challenge] && headers[x-btx-proof-nonce] && headers[x-btx-proof-digest]` check. |
+| Field            | Type                        | Notes                                                                                                                                             |
+| ---------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client`         | `BtxChallengeClient`        | required. Construct once at boot.                                                                                                                 |
+| `purpose`        | `string \| (req) => string` | required. Logical purpose label.                                                                                                                  |
+| `resource`       | `string \| (req) => string` | required. Resource identifier.                                                                                                                    |
+| `subject`        | `string \| (req) => string` | required. Subject identifier.                                                                                                                     |
+| `issueParams`    | `Partial<IssueParams>`      | optional. Extra params forwarded to `client.issue()`.                                                                                             |
+| `onAdmit`        | `(req, result) => void`     | optional. Fires on successful admission.                                                                                                          |
+| `onError`        | `(err, req) => void`        | optional. Fires when `client.issue()` or `client.redeem()` throws, exactly once before the preHandler re-throws. Use for logging. Audit ref: D-1. |
+| `isProofPresent` | `(req) => boolean`          | optional. Override the default `headers[x-btx-challenge] && headers[x-btx-proof-nonce] && headers[x-btx-proof-digest]` check.                     |
 
 ### Header constants
 
-| Constant | Value |
-|---|---|
-| `HEADER_CHALLENGE` | `'x-btx-challenge'` |
+| Constant              | Value                  |
+| --------------------- | ---------------------- |
+| `HEADER_CHALLENGE`    | `'x-btx-challenge'`    |
 | `HEADER_CHALLENGE_ID` | `'x-btx-challenge-id'` |
-| `HEADER_PROOF_NONCE` | `'x-btx-proof-nonce'` |
+| `HEADER_PROOF_NONCE`  | `'x-btx-proof-nonce'`  |
 | `HEADER_PROOF_DIGEST` | `'x-btx-proof-digest'` |
 
 (Fastify lowercases incoming header names, hence the lowercase form here. Outgoing `reply.header()` accepts any case.)
@@ -82,6 +88,7 @@ Returns a Fastify preHandler hook to attach per-route.
 ## Error handling
 
 When `client.issue()` or `client.redeem()` throws (e.g., btxd RPC down, network error), the middleware:
+
 1. Calls `opts.onError(err, req)` if provided
 2. Re-throws — Fastify's standard error-handling pipeline kicks in (default 500, or whatever your error handler returns)
 

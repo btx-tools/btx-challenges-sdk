@@ -1,0 +1,65 @@
+name: Docs
+
+# Generates the TypeDoc API reference for all @btx-tools/* SDK packages and
+# deploys it to GitHub Pages. First successful run enables Pages on the repo
+# (configure-pages `enablement: true`) with "GitHub Actions" as the source.
+# Site: https://btx-tools.github.io/btx-challenges-sdk/
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least-privilege token scoped for Pages deployment.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one in-flight Pages deployment at a time; don't cancel a running deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        # pnpm version resolves from package.json `packageManager` field.
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        # TypeDoc reads source via each package's tsconfig, but cross-package
+        # type references (middleware-* import @btx-tools/challenges-sdk) resolve
+        # through core's emitted dist/*.d.ts — so build must run first.
+        run: pnpm -r build
+
+      - name: Generate API docs
+        run: pnpm docs
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

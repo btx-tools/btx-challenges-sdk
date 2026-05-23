@@ -5,6 +5,8 @@
 
 Drop-in Express admission gate backed by [BTX](https://btx.dev) service challenges. Turns an Express route into a chain-anchored proof-of-work checkpoint with one line.
 
+📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** — TypeDoc for all `@btx-tools/*` SDK packages.
+
 > **Status**: 0.2.0. Requires `@btx-tools/challenges-sdk@^0.0.1`. **Breaking change from 0.1.x**: `Express.Request.btxResult` was renamed to `req.btx.result` (see [CHANGELOG](./CHANGELOG.md#020---2026-05-22) for migration).
 
 > **End-to-end example**: clone the repo and run [`examples/02-express-gate`](../../examples/02-express-gate) for a working server + client pair you can copy from. Walks the full 402 → solve → 200 → 403-replay flow against a live btxd.
@@ -25,7 +27,7 @@ import { BtxChallengeClient } from '@btx-tools/challenges-sdk';
 import { btxAdmission } from '@btx-tools/middleware-express';
 
 const client = new BtxChallengeClient({
-  rpcUrl: 'http://127.0.0.1:19334',           // dedicated NON-mining btxd
+  rpcUrl: 'http://127.0.0.1:19334', // dedicated NON-mining btxd
   rpcAuth: { user: 'rpcuser', pass: 'rpcpass' },
 });
 
@@ -73,12 +75,12 @@ Server →   200 OK   (req.btx?.result populated; your handler runs)
 
 Failure cases (server-side, all return JSON):
 
-| Code | When |
-|---|---|
-| `400 Bad Request` | retry missing `X-BTX-Challenge` echo, malformed JSON, or `X-BTX-Challenge-Id` mismatch |
-| `402 Payment Required` | normal first-request response — client should solve and retry |
-| `403 Forbidden` | redeem failed — `{ valid: false, reason }`. Possible reasons: `invalid_proof`, `expired`, `already_redeemed`, `unknown_challenge` |
-| `500 Internal Server Error` | btxd RPC layer threw — surfaced via `next(err)`, handled by your Express error middleware |
+| Code                        | When                                                                                                                              |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Bad Request`           | retry missing `X-BTX-Challenge` echo, malformed JSON, or `X-BTX-Challenge-Id` mismatch                                            |
+| `402 Payment Required`      | normal first-request response — client should solve and retry                                                                     |
+| `403 Forbidden`             | redeem failed — `{ valid: false, reason }`. Possible reasons: `invalid_proof`, `expired`, `already_redeemed`, `unknown_challenge` |
+| `500 Internal Server Error` | btxd RPC layer threw — surfaced via `next(err)`, handled by your Express error middleware                                         |
 
 ## API
 
@@ -86,25 +88,25 @@ Failure cases (server-side, all return JSON):
 
 Returns a standard Express `RequestHandler`.
 
-| Option | Type | Required | Description |
-|---|---|---|---|
-| `client` | `BtxChallengeClient` | ✅ | The RPC client constructed at boot |
-| `purpose` | `string \| (req) => string` | ✅ | Logical purpose label — `'ai_inference_gate'`, `'rate_limit'`, `'api_gate'`, or your own |
-| `resource` | `string \| (req) => string` | ✅ | Resource identifier — what's being gated |
-| `subject` | `string \| (req) => string` | ✅ | Subject identifier — who's being challenged |
-| `issueParams` | `Partial<IssueParams>` | | Forwarded to `client.issue()` (e.g. `target_solve_time_s`, `expires_in_s`) |
-| `onAdmit` | `(req, result) => void` | | Hook fired on successful admission |
-| `onError` | `(err, req) => void` | | **New in 0.2.0** — hook fired exactly once when `client.issue()` or `client.redeem()` throws, before `next(err)` is invoked. Use for logging / observability; don't mutate the error |
-| `isProofPresent` | `(req) => boolean` | | Override the default "all 3 proof headers set?" check |
+| Option           | Type                        | Required | Description                                                                                                                                                                          |
+| ---------------- | --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `client`         | `BtxChallengeClient`        | ✅       | The RPC client constructed at boot                                                                                                                                                   |
+| `purpose`        | `string \| (req) => string` | ✅       | Logical purpose label — `'ai_inference_gate'`, `'rate_limit'`, `'api_gate'`, or your own                                                                                             |
+| `resource`       | `string \| (req) => string` | ✅       | Resource identifier — what's being gated                                                                                                                                             |
+| `subject`        | `string \| (req) => string` | ✅       | Subject identifier — who's being challenged                                                                                                                                          |
+| `issueParams`    | `Partial<IssueParams>`      |          | Forwarded to `client.issue()` (e.g. `target_solve_time_s`, `expires_in_s`)                                                                                                           |
+| `onAdmit`        | `(req, result) => void`     |          | Hook fired on successful admission                                                                                                                                                   |
+| `onError`        | `(err, req) => void`        |          | **New in 0.2.0** — hook fired exactly once when `client.issue()` or `client.redeem()` throws, before `next(err)` is invoked. Use for logging / observability; don't mutate the error |
+| `isProofPresent` | `(req) => boolean`          |          | Override the default "all 3 proof headers set?" check                                                                                                                                |
 
 ### Constants
 
 ```typescript
 import {
-  HEADER_CHALLENGE,         // 'X-BTX-Challenge'
-  HEADER_CHALLENGE_ID,      // 'X-BTX-Challenge-Id'
-  HEADER_PROOF_NONCE,       // 'X-BTX-Proof-Nonce'
-  HEADER_PROOF_DIGEST,      // 'X-BTX-Proof-Digest'
+  HEADER_CHALLENGE, // 'X-BTX-Challenge'
+  HEADER_CHALLENGE_ID, // 'X-BTX-Challenge-Id'
+  HEADER_PROOF_NONCE, // 'X-BTX-Proof-Nonce'
+  HEADER_PROOF_DIGEST, // 'X-BTX-Proof-Digest'
 } from '@btx-tools/middleware-express';
 ```
 
@@ -127,7 +129,7 @@ When `client.issue()` or `client.redeem()` throws, the middleware calls `next(er
 ```typescript
 app.use((err, req, res, next) => {
   // Optional: also log via your APM here
-  res.status(500).json({ error: 'internal_error' });   // never err.message
+  res.status(500).json({ error: 'internal_error' }); // never err.message
 });
 ```
 
@@ -163,19 +165,21 @@ The `X-BTX-Challenge`, `X-BTX-Proof-Nonce`, and `X-BTX-Proof-Digest` headers are
 
 ```ts
 import cors from 'cors';
-app.use(cors({
-  origin: 'https://your-frontend.example',
-  allowedHeaders: [
-    'content-type',
-    'x-btx-challenge',
-    'x-btx-challenge-id',
-    'x-btx-proof-nonce',
-    'x-btx-proof-digest',
-  ],
-  exposedHeaders: [
-    'x-btx-challenge', // so the browser can READ the 402's challenge header
-  ],
-}));
+app.use(
+  cors({
+    origin: 'https://your-frontend.example',
+    allowedHeaders: [
+      'content-type',
+      'x-btx-challenge',
+      'x-btx-challenge-id',
+      'x-btx-proof-nonce',
+      'x-btx-proof-digest',
+    ],
+    exposedHeaders: [
+      'x-btx-challenge', // so the browser can READ the 402's challenge header
+    ],
+  }),
+);
 ```
 
 Without `exposedHeaders` including `x-btx-challenge`, the browser sees the 402 status but **cannot** read the challenge JSON from the response header (Web Fetch hides non-CORS-safelisted response headers by default).

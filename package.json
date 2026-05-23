@@ -12,11 +12,14 @@
     "test": "pnpm -r test",
     "test:unit": "pnpm -r --filter './packages/*' test -- --project unit",
     "type-check": "pnpm -r type-check",
+    "docs": "typedoc",
+    "docs:watch": "typedoc --watch",
     "format": "prettier --write \"packages/**/*.{ts,json,md}\" \"*.{json,md,yml,yaml}\"",
-    "clean": "pnpm -r exec rm -rf dist node_modules .turbo"
+    "clean": "pnpm -r exec rm -rf dist node_modules .turbo docs-site"
   },
   "devDependencies": {
-    "prettier": "^3.3.0"
+    "prettier": "^3.3.0",
+    "typedoc": "^0.28.19"
   },
   "engines": {
     "node": ">=18.17",

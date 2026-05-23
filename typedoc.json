@@ -1,0 +1,24 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPointStrategy": "packages",
+  "entryPoints": [
+    "packages/core",
+    "packages/middleware-express",
+    "packages/middleware-fastify",
+    "packages/middleware-hono"
+  ],
+  "packageOptions": {
+    "entryPoints": ["src/index.ts"],
+    "excludeInternal": true,
+    "excludePrivate": true
+  },
+  "out": "docs-site",
+  "name": "@btx-tools SDK — BTX service-challenge admission control",
+  "readme": "README.md",
+  "navigationLinks": {
+    "GitHub": "https://github.com/btx-tools/btx-challenges-sdk",
+    "npm": "https://www.npmjs.com/package/@btx-tools/challenges-sdk"
+  },
+  "hideGenerator": false,
+  "githubPages": true
+}

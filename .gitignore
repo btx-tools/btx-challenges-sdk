@@ -11,3 +11,4 @@ coverage/
 .cache/
 .turbo/
 *.tgz
+docs-site/

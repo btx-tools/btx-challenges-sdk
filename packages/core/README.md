@@ -1,10 +1,13 @@
-# @btx/challenges-sdk
+# @btx-tools/challenges-sdk
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![npm](https://img.shields.io/npm/v/@btx-tools/challenges-sdk)](https://www.npmjs.com/package/@btx-tools/challenges-sdk)
 
 TypeScript SDK for **BTX service challenges** — chain-anchored proof-of-work admission control for APIs, agent gateways, and form submissions.
 
-> ⚠️ **Status**: 0.0.1 pre-release. Day 2.5 shipped: RPC + pure-JS solver, cross-validated byte-equal against btxd's own pinned test vectors. See [CHANGELOG](https://github.com/btx-tools/btx-challenges-sdk/blob/main/CHANGELOG.md).
+📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** — full TypeDoc for this package and the middleware adapters.
+
+> **Status**: 0.3.0. RPC + pure-JS solver cross-validated byte-equal against btxd's own pinned test vectors; opt-in retry/backoff (`onRetry` hook) + per-method timeouts (raw or semantic keys) + `AbortSignal` plumbing. All audit findings closed. See [CHANGELOG](https://github.com/btx-tools/btx-challenges-sdk/blob/main/CHANGELOG.md).
 
 ## What is this?
 
@@ -22,15 +25,15 @@ Issue a challenge → client solves a ~1–4 second matrix-multiplication puzzle
 ## Install
 
 ```bash
-npm install @btx/challenges-sdk
+npm install @btx-tools/challenges-sdk
 # or
-pnpm add @btx/challenges-sdk
+pnpm add @btx-tools/challenges-sdk
 ```
 
 ## Quickstart
 
 ```typescript
-import { BtxChallengeClient } from '@btx/challenges-sdk';
+import { BtxChallengeClient } from '@btx-tools/challenges-sdk';
 
 const client = new BtxChallengeClient({
   rpcUrl: 'http://127.0.0.1:19332',
@@ -74,13 +77,13 @@ The SDK does NOT enforce HTTPS — that's a deployment concern. If you set `rpcU
 
 ```typescript
 import {
-  BtxError,        // base class — all SDK errors extend this
-  BtxRpcError,     // btxd returned a JSON-RPC error envelope
-  BtxHttpError,    // non-2xx HTTP status
-  BtxParseError,   // 2xx but body wasn't valid JSON
+  BtxError, // base class — all SDK errors extend this
+  BtxRpcError, // btxd returned a JSON-RPC error envelope
+  BtxHttpError, // non-2xx HTTP status
+  BtxParseError, // 2xx but body wasn't valid JSON
   BtxTimeoutError, // request exceeded timeoutMs
   BtxNetworkError, // DNS/TCP/TLS-level failure
-} from '@btx/challenges-sdk';
+} from '@btx-tools/challenges-sdk';
 
 try {
   await client.redeem(challenge, nonce, digest);
@@ -101,15 +104,15 @@ Error response bodies are scanned and `Authorization: Basic <token>` patterns ar
 
 ### `BtxChallengeClient`
 
-| Method | RPC | Description |
-|---|---|---|
-| `issue(params)` | `getmatmulservicechallenge` | Issue a fresh challenge bound to (purpose, resource, subject). |
-| `verify(...)` | `verifymatmulserviceproof` | Stateless verify. Does NOT consume the challenge. |
-| `redeem(...)` | `redeemmatmulserviceproof` | **Atomic verify + consume**. Use for admission control. |
-| `verifyBatch(entries)` | `verifymatmulserviceproofs` | Batch (1–256) verify. No consumption. |
-| `redeemBatch(entries)` | `redeemmatmulserviceproofs` | Batch verify + consume, sequential. |
-| `solve(challenge)` | `solvematmulservicechallenge` | Server-side solver (fixtures + tests). |
-| `call(method, params)` | (any) | Low-level escape hatch. |
+| Method                 | RPC                           | Description                                                    |
+| ---------------------- | ----------------------------- | -------------------------------------------------------------- |
+| `issue(params)`        | `getmatmulservicechallenge`   | Issue a fresh challenge bound to (purpose, resource, subject). |
+| `verify(...)`          | `verifymatmulserviceproof`    | Stateless verify. Does NOT consume the challenge.              |
+| `redeem(...)`          | `redeemmatmulserviceproof`    | **Atomic verify + consume**. Use for admission control.        |
+| `verifyBatch(entries)` | `verifymatmulserviceproofs`   | Batch (1–256) verify. No consumption.                          |
+| `redeemBatch(entries)` | `redeemmatmulserviceproofs`   | Batch verify + consume, sequential.                            |
+| `solve(challenge)`     | `solvematmulservicechallenge` | Server-side solver (fixtures + tests).                         |
+| `call(method, params)` | (any)                         | Low-level escape hatch.                                        |
 
 ### `Solver`
 
@@ -120,7 +123,7 @@ Three modes:
 - **`'auto'`** (default) — picks `'rpc'` if `opts.rpcClient` is provided, else `'pure-js'`.
 
 ```typescript
-import { BtxChallengeClient, Solver } from '@btx/challenges-sdk';
+import { BtxChallengeClient, Solver } from '@btx-tools/challenges-sdk';
 
 // Server-side (RPC mode): delegates the solve to btxd
 const client = new BtxChallengeClient({ rpcUrl: '...', rpcAuth: { ... } });
@@ -158,23 +161,23 @@ For RPC mode at advertised latency (~1–4 seconds), point it at a **dedicated b
 
 Pure-JS solver bench at production matmul shape (n=512, b=16, r=8) on M-series Mac arm64 (2026-05-22, 5-sample mean):
 
-| Engine | Mean / attempt | vs Node 22 |
-|---|---|---|
-| **Node 22.20 / V8** | **4.6 s** | 1.0× (baseline) |
-| Deno 2.7 / V8 | 4.2 s | 0.92× (slightly faster, within noise) |
-| Bun 1.3 / JavaScriptCore | 9.8 s | **2.1× slower** |
-| Firefox SpiderMonkey | untested | — |
-| Safari JavaScriptCore | untested | — |
+| Engine                   | Mean / attempt | vs Node 22                            |
+| ------------------------ | -------------- | ------------------------------------- |
+| **Node 22.20 / V8**      | **4.6 s**      | 1.0× (baseline)                       |
+| Deno 2.7 / V8            | 4.2 s          | 0.92× (slightly faster, within noise) |
+| Bun 1.3 / JavaScriptCore | 9.8 s          | **2.1× slower**                       |
+| Firefox SpiderMonkey     | untested       | —                                     |
+| Safari JavaScriptCore    | untested       | —                                     |
 
 `mul` and the `dot` accumulator use `bigint` because the worst-case M31 product (`(2^31-1)^2 ≈ 2^62`) exceeds `Number`'s 2^53 precision. The `bigint`-bounded inner loop is the dominant cost. **Bun's JavaScriptCore engine is ~2× slower than V8 for `bigint`-heavy workloads** — if Bun is your runtime, factor that into your `target_solve_time_s` calibration.
 
 Expected end-to-end solve time depends on challenge difficulty. At btxd's lowest service-challenge difficulty (`target_solve_time_s = min_solve_time_s = 0.001`), per-attempt success ≈ 1.3·10⁻³, so expected ≈ 770 attempts:
 
-| Engine | Expected solve at floor difficulty |
-|---|---|
-| Node 22 / V8 | ~59 min |
-| Deno 2.7 / V8 | ~54 min |
-| Bun 1.3 / JSC | ~2.1 hr |
+| Engine        | Expected solve at floor difficulty |
+| ------------- | ---------------------------------- |
+| Node 22 / V8  | ~59 min                            |
+| Deno 2.7 / V8 | ~54 min                            |
+| Bun 1.3 / JSC | ~2.1 hr                            |
 
 **Default difficulty is too slow for online browser use.** Workable today for:
 
@@ -226,18 +229,18 @@ Fastify + Hono adapters queued as `@btx-tools/middleware-fastify` + `@btx-tools/
 
 ## Roadmap
 
-| Status | Item |
-|---|---|
-| ✅ | Day 1: RPC client + types + audit Wave A/B/C fixes |
-| ✅ | Day 2: Solver class with mode dispatch (RPC mode ships) |
-| ✅ | Day 2.5: Pure-JS MatMul solver port, cross-validated against btxd goldens |
-| ✅ | Day 3 (partial): Express middleware → `@btx-tools/middleware-express@0.1.0` |
-| ⏳ | Day 2.6: WASM port of matmul kernel (perf) |
-| ⏳ | Day 3 (rest): Fastify + Hono adapters (separate sub-packages) |
-| ⏳ | Day 4: Browser demo + Node examples |
-| ⏳ | Day 5-6: `@btx-tools/mcp-gateway` companion package |
-| ⏳ | Day 7-8: Docs + announce |
-| ⏳ | Day 9: Findings + handoff |
+| Status | Item                                                                        |
+| ------ | --------------------------------------------------------------------------- |
+| ✅     | Day 1: RPC client + types + audit Wave A/B/C fixes                          |
+| ✅     | Day 2: Solver class with mode dispatch (RPC mode ships)                     |
+| ✅     | Day 2.5: Pure-JS MatMul solver port, cross-validated against btxd goldens   |
+| ✅     | Day 3 (partial): Express middleware → `@btx-tools/middleware-express@0.1.0` |
+| ⏳     | Day 2.6: WASM port of matmul kernel (perf)                                  |
+| ⏳     | Day 3 (rest): Fastify + Hono adapters (separate sub-packages)               |
+| ⏳     | Day 4: Browser demo + Node examples                                         |
+| ⏳     | Day 5-6: `@btx-tools/mcp-gateway` companion package                         |
+| ⏳     | Day 7-8: Docs + announce                                                    |
+| ⏳     | Day 9: Findings + handoff                                                   |
 
 ## Testing
 
