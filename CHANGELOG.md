@@ -4,6 +4,41 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-23
+
+Minor release — lands the two additive API features deferred from the `0.1.1`/`0.2.0` audits (L-3 + L-4). Backwards-compatible with `0.2.0`: both are optional, no signature changes, no behavior change for code that doesn't opt in.
+
+### Added — `@btx-tools/challenges-sdk` (0.2.0 → 0.3.0)
+
+- **`RetryOptions.onRetry?: (attempt, error, nextDelayMs) => void`** (audit L-3) — observability hook fired once per scheduled retry, **before** the backoff sleep, with:
+  - `attempt` — 1-indexed retry number (1 = first retry after the initial call)
+  - `error` — the retryable error from the just-failed attempt (`BtxNetworkError` or a 5xx `BtxHttpError`)
+  - `nextDelayMs` — the exact delay (post-jitter) about to be slept
+
+  Fires only for retryable failures (non-retryable errors throw before another attempt is scheduled). If the caller's `AbortSignal` fires during the subsequent sleep, the retry is still abandoned — the hook reports intent-to-retry, not success. A throw inside the callback propagates out of the client call; keep it cheap.
+
+- **Semantic shortcut keys for `methodTimeouts`** (audit L-4) — in addition to raw btxd RPC method names, `methodTimeouts` now accepts semantic aliases:
+
+  | semantic      | raw RPC method                |
+  | ------------- | ----------------------------- |
+  | `issue`       | `getmatmulservicechallenge`   |
+  | `verify`      | `verifymatmulserviceproof`    |
+  | `redeem`      | `redeemmatmulserviceproof`    |
+  | `verifyBatch` | `verifymatmulserviceproofs`   |
+  | `redeemBatch` | `redeemmatmulserviceproofs`   |
+  | `solve`       | `solvematmulservicechallenge` |
+
+  e.g. `{ solve: 1_000_000 }` instead of `{ solvematmulservicechallenge: 1_000_000 }`. A raw-method key always wins over its semantic alias (more specific). The existing `≤ 0 = no override` rule (audit M-1) is preserved at every resolution level.
+
+### Test delta
+
+168 → 176 tests (+8): four for `onRetry` (fires per-retry with 1-indexed attempt + retryable error; not called when `max: 0`; exact post-backoff delay series; never fires on a 4xx), four for semantic aliases (`solve` alias applies; raw key beats alias; alias `≤ 0` falls through; `issue` alias applies).
+
+### Notes
+
+- Both features close the last two deferred audit items; no remaining audit findings block a `1.0.0` API freeze.
+- Only `@btx-tools/challenges-sdk` changes — middleware (express/fastify/hono) + `mcp-gateway` are unaffected (the new options are additive and read inside core).
+
 ## [0.2.0] - 2026-05-23
 
 Minor release — adds AbortSignal plumbing across the public client surface. Backwards-compatible with `0.1.1` (all new args are optional and trailing).
@@ -69,18 +104,22 @@ Backwards-compatible: no API removals, no signature changes. Recommended upgrade
 ### @btx-tools/challenges-sdk (0.1.0 → 0.1.1)
 
 #### Bug fixes
+
 - **H-1**: `retry.max` is now clamped via `Math.max(0, Math.floor(Number(retry.max) || 0))`. Previously, a negative or `NaN` `max` value caused the retry loop to skip entirely, throwing `undefined` (not a `BtxError`). Now the call always runs at least once and throws a real `BtxError` on failure.
 - **M-1**: `methodTimeouts[method] ≤ 0` and `timeoutMs ≤ 0` now fall through to the next layer (per-method → client-wide → 30 s default) instead of being treated as "instant abort." Previously, `methodTimeouts: { x: 0 }` would abort the request immediately on first tick, almost certainly not what the caller intended.
 - **M-2**: retry delay is now capped at `MAX_RETRY_DELAY_MS = 60_000` (60 s). Previously, a high `retry.max` with large `baseDelayMs` could schedule individual retry delays in the hours/days range.
 
 #### Documentation
+
 - **M-3**: inline comment on `Math.random()` jitter — non-security context (matches A-3 convention from the 2026-05-22 audit).
 - **M-1 + M-2**: JSDoc on `BtxClientOpts.timeoutMs` / `methodTimeouts` / `RetryOptions.max` / `RetryOptions.baseDelayMs` updated with new clamp + cap semantics.
 
 #### Tests
+
 - 6 new unit tests for the H-1, M-2, M-5, M-6 cases. Core test count: 152 → 158.
 
 #### Deferred to `0.2.0` (additive feature work)
+
 - **L-3**: `onRetry?: (attempt, err, nextDelayMs) => void` observability callback
 - **L-4**: semantic shortcut keys for `methodTimeouts` (e.g., `{ solve: ... }` in addition to raw RPC names)
 
@@ -182,10 +221,10 @@ Audit-resolution release. All non-breaking findings from the 2026-05-22 deep aud
 
 Regex-replace across your codebase:
 
-| Before (0.1.x) | After (0.2.0) |
-|---|---|
-| `req.btxResult` | `req.btx?.result` |
-| `req.btxResult?.reason` | `req.btx?.result.reason` |
+| Before (0.1.x)            | After (0.2.0)              |
+| ------------------------- | -------------------------- |
+| `req.btxResult`           | `req.btx?.result`          |
+| `req.btxResult?.reason`   | `req.btx?.result.reason`   |
 | `req.btxResult!.redeemed` | `req.btx!.result.redeemed` |
 
 If you don't read `req.btxResult` in your handlers, no migration needed.
@@ -325,4 +364,4 @@ btxd's `solvematmulservicechallenge` RPC shares matmul backend with block mining
 
 ---
 
-*See `internal notes` for the full audit report.*
+_See `internal notes` for the full audit report._

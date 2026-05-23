@@ -30,6 +30,21 @@ interface JsonRpcResponse<T> {
 const MAX_RETRY_DELAY_MS = 60_000;
 
 /**
+ * Semantic shortcut keys for {@link BtxClientOpts.methodTimeouts} → raw btxd RPC
+ * method names (audit L-4, 0.3.0). Lets callers write `{ solve: 1_000_000 }`
+ * instead of the verbose `{ solvematmulservicechallenge: 1_000_000 }`. A raw
+ * method key always takes precedence over its semantic alias.
+ */
+const SEMANTIC_TIMEOUT_ALIAS: Readonly<Record<string, string>> = {
+  getmatmulservicechallenge: 'issue',
+  verifymatmulserviceproof: 'verify',
+  redeemmatmulserviceproof: 'redeem',
+  verifymatmulserviceproofs: 'verifyBatch',
+  redeemmatmulserviceproofs: 'redeemBatch',
+  solvematmulservicechallenge: 'solve',
+};
+
+/**
  * Sentinel error thrown internally when an external AbortSignal fires. Caught
  * at the public-method boundary and rethrown as {@link BtxNetworkError} so
  * callers see a documented error type. Added 0.2.0.
@@ -150,11 +165,7 @@ export class BtxChallengeClient {
    * audit D-3). Both are opt-in via constructor options; default behavior is
    * unchanged from 0.0.4 (30s single-attempt).
    */
-  async call<T = unknown>(
-    method: string,
-    params: unknown[] = [],
-    opts?: RpcCallOpts,
-  ): Promise<T> {
+  async call<T = unknown>(method: string, params: unknown[] = [], opts?: RpcCallOpts): Promise<T> {
     const retry = this.opts.retry ?? { max: 0 };
     // H-1 (audit 2026-05-23): clamp non-integer / negative / NaN to ≥0 so the
     // loop runs at least once and `lastErr` is never thrown undefined.
@@ -177,6 +188,10 @@ export class BtxChallengeClient {
         // M-3: jitter — not security-sensitive; Math.random is appropriate here
         // (matches the nextRequestId fallback convention per audit A-3).
         const jittered = retry.jitter ? delay + Math.random() * baseDelayMs : delay;
+        // L-3 (0.3.0): observability hook — fired before the backoff sleep with
+        // the exact delay about to be slept and the retryable error that
+        // triggered this retry. `attempt` is 1-indexed (1 = first retry).
+        retry.onRetry?.(attempt, lastErr, jittered);
         try {
           // 0.2.0: backoff sleep honors external abort signal — caller-cancel
           // mid-retry exits the loop without sending another request.
@@ -231,11 +246,19 @@ export class BtxChallengeClient {
 
     const ctrl = new AbortController();
     // D-4: per-method override → client-wide → 30s default.
+    // L-4 (0.3.0): the override key may be the raw RPC method name OR a semantic
+    // alias (e.g. `solve` for `solvematmulservicechallenge`). The raw method key
+    // wins over the alias (more specific); each falls through if absent.
     // M-1 (audit 2026-05-23): values ≤ 0 are treated as "no override" — fall
     // through to the next layer. A literal 0 from methodTimeouts would
     // otherwise mean "instant abort", which is almost certainly not what the
     // caller wanted.
-    const perMethod = this.opts.methodTimeouts?.[method];
+    const perMethodRaw = this.opts.methodTimeouts?.[method];
+    const aliasKey = SEMANTIC_TIMEOUT_ALIAS[method];
+    const perMethodAlias =
+      aliasKey !== undefined ? this.opts.methodTimeouts?.[aliasKey] : undefined;
+    const perMethod =
+      perMethodRaw !== undefined && perMethodRaw > 0 ? perMethodRaw : perMethodAlias;
     const timeoutMs =
       perMethod !== undefined && perMethod > 0
         ? perMethod

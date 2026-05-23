@@ -350,9 +350,7 @@ describe('BtxChallengeClient — D-4 per-method timeout (audit D-4)', () => {
 
   it('falls back to client-wide timeoutMs when method has no override', async () => {
     server.use(
-      http.post(RPC_URL, () =>
-        HttpResponse.json({ result: stubChallenge, error: null, id: 1 }),
-      ),
+      http.post(RPC_URL, () => HttpResponse.json({ result: stubChallenge, error: null, id: 1 })),
     );
     const client = new BtxChallengeClient({
       rpcUrl: RPC_URL,
@@ -369,9 +367,7 @@ describe('BtxChallengeClient — D-4 per-method timeout (audit D-4)', () => {
     // Only assert the option resolves cleanly. We don't want to actually wait 30s
     // to confirm the default; covered by code review of client.ts:62.
     server.use(
-      http.post(RPC_URL, () =>
-        HttpResponse.json({ result: stubChallenge, error: null, id: 1 }),
-      ),
+      http.post(RPC_URL, () => HttpResponse.json({ result: stubChallenge, error: null, id: 1 })),
     );
     const client = new BtxChallengeClient({
       rpcUrl: RPC_URL,
@@ -391,9 +387,10 @@ describe('BtxChallengeClient — D-4 per-method timeout (audit D-4)', () => {
           await new Promise((r) => setTimeout(r, 150));
         }
         return HttpResponse.json({
-          result: body.method === 'getmatmulservicechallenge'
-            ? stubChallenge
-            : { nonce64_hex: '0'.repeat(16), digest_hex: '0'.repeat(64), proof: {} },
+          result:
+            body.method === 'getmatmulservicechallenge'
+              ? stubChallenge
+              : { nonce64_hex: '0'.repeat(16), digest_hex: '0'.repeat(64), proof: {} },
           error: null,
           id: 1,
         });
@@ -589,9 +586,7 @@ describe('BtxChallengeClient — D-3 + D-4 audit 0.1.1 hardening (audit 2026-05-
   it('M-5 + M-2: exponential backoff grows + capped at MAX_RETRY_DELAY_MS', async () => {
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     try {
-      server.use(
-        http.post(RPC_URL, () => HttpResponse.text('boom', { status: 503 })),
-      );
+      server.use(http.post(RPC_URL, () => HttpResponse.text('boom', { status: 503 })));
       const client = new BtxChallengeClient({
         rpcUrl: RPC_URL,
         rpcAuth: { user: 'u', pass: 'p' },
@@ -674,6 +669,154 @@ describe('BtxChallengeClient — D-3 + D-4 audit 0.1.1 hardening (audit 2026-05-
     });
     const c = await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
     expect(c.challenge_id).toBe('test-cid');
+  });
+});
+
+describe('BtxChallengeClient — L-3 onRetry hook (audit 2026-05-23, shipped 0.3.0)', () => {
+  it('L-3: onRetry fires once per scheduled retry with 1-indexed attempt + retryable error', async () => {
+    const calls: Array<{ attempt: number; error: unknown }> = [];
+    server.use(http.post(RPC_URL, () => HttpResponse.text('boom', { status: 503 })));
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      retry: {
+        max: 2,
+        baseDelayMs: 1,
+        onRetry: (attempt, error) => calls.push({ attempt, error }),
+      },
+    });
+    await expect(
+      client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
+    ).rejects.toBeInstanceOf(BtxHttpError);
+    // 1 initial + 2 retries → onRetry fires before retry #1 and #2 only.
+    expect(calls.map((c) => c.attempt)).toEqual([1, 2]);
+    expect(calls.every((c) => c.error instanceof BtxHttpError)).toBe(true);
+  });
+
+  it('L-3: onRetry is not called when retry is disabled (max: 0)', async () => {
+    const onRetry = vi.fn();
+    server.use(http.post(RPC_URL, () => HttpResponse.text('boom', { status: 503 })));
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      retry: { max: 0, baseDelayMs: 1, onRetry },
+    });
+    await expect(
+      client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
+    ).rejects.toBeInstanceOf(BtxHttpError);
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it('L-3: onRetry reports the exact post-backoff delay series (no jitter)', async () => {
+    const delays: number[] = [];
+    server.use(http.post(RPC_URL, () => HttpResponse.text('boom', { status: 503 })));
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      retry: {
+        max: 3,
+        baseDelayMs: 10,
+        jitter: false,
+        onRetry: (_attempt, _error, nextDelayMs) => delays.push(nextDelayMs),
+      },
+    });
+    await expect(
+      client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
+    ).rejects.toBeInstanceOf(BtxHttpError);
+    // Geometric series baseDelayMs * 2^(N-1): 10, 20, 40.
+    expect(delays).toEqual([10, 20, 40]);
+  });
+
+  it('L-3: onRetry never fires for a non-retryable error (4xx)', async () => {
+    const onRetry = vi.fn();
+    server.use(http.post(RPC_URL, () => HttpResponse.text('nope', { status: 401 })));
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      retry: { max: 5, baseDelayMs: 1, onRetry },
+    });
+    await expect(
+      client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
+    ).rejects.toBeInstanceOf(BtxHttpError);
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+});
+
+describe('BtxChallengeClient — L-4 semantic methodTimeouts aliases (audit 2026-05-23, shipped 0.3.0)', () => {
+  // Helper: server that holds solvematmulservicechallenge for `solveHoldMs` and
+  // answers issue (getmatmulservicechallenge) instantly.
+  const useSolveHoldServer = (solveHoldMs: number): void => {
+    server.use(
+      http.post(RPC_URL, async ({ request }) => {
+        const body = (await request.json()) as { method: string };
+        if (body.method === 'solvematmulservicechallenge') {
+          await new Promise((r) => setTimeout(r, solveHoldMs));
+          return HttpResponse.json({
+            result: { nonce64_hex: '0'.repeat(16), digest_hex: '0'.repeat(64), proof: {} },
+            error: null,
+            id: 1,
+          });
+        }
+        return HttpResponse.json({ result: stubChallenge, error: null, id: 1 });
+      }),
+    );
+  };
+
+  it('L-4: semantic `solve` key applies the timeout to solvematmulservicechallenge', async () => {
+    useSolveHoldServer(200); // solve holds 200ms; `solve` budget is 50ms
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      timeoutMs: 5_000,
+      methodTimeouts: { solve: 50 },
+    });
+    const c = await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    await expect(client.solve(c)).rejects.toBeInstanceOf(BtxTimeoutError);
+  });
+
+  it('L-4: a raw method key wins over its semantic alias when both are set', async () => {
+    useSolveHoldServer(150); // solve holds 150ms
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      timeoutMs: 5_000,
+      // raw 500ms (fits the 150ms hold) must beat the alias 1ms (would time out).
+      methodTimeouts: { solvematmulservicechallenge: 500, solve: 1 },
+    });
+    const c = await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    const p = await client.solve(c);
+    expect(p.nonce64_hex).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('L-4: a semantic alias value ≤ 0 falls through (M-1 preserved)', async () => {
+    useSolveHoldServer(100); // solve holds 100ms; alias is 0 → falls to client-wide 5000ms
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      timeoutMs: 5_000,
+      methodTimeouts: { solve: 0 },
+    });
+    const c = await client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    const p = await client.solve(c);
+    expect(p.nonce64_hex).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('L-4: semantic `issue` key applies to getmatmulservicechallenge', async () => {
+    server.use(
+      http.post(RPC_URL, async () => {
+        await new Promise((r) => setTimeout(r, 200)); // issue holds 200ms; budget 50ms
+        return HttpResponse.json({ result: stubChallenge, error: null, id: 1 });
+      }),
+    );
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      timeoutMs: 5_000,
+      methodTimeouts: { issue: 50 },
+    });
+    await expect(
+      client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' }),
+    ).rejects.toBeInstanceOf(BtxTimeoutError);
   });
 });
 

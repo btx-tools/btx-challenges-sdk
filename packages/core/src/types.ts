@@ -221,6 +221,25 @@ export interface RetryOptions {
   baseDelayMs?: number;
   /** If `true`, adds `random(0, baseDelayMs)` of jitter to each delay. Default `false`. */
   jitter?: boolean;
+  /**
+   * Observability hook fired once per scheduled retry, **before** the backoff
+   * sleep, with the exact delay (post-jitter) about to be slept.
+   *
+   * - `attempt` — 1-indexed retry number (1 = first retry after the initial call).
+   * - `error` — the retryable error from the just-failed attempt (a {@link BtxError}
+   *   subclass: {@link BtxNetworkError} or {@link BtxHttpError} for a 5xx).
+   * - `nextDelayMs` — the precise delay (including jitter) about to be slept.
+   *
+   * Fires only for retryable failures — non-retryable errors throw before the
+   * next attempt is scheduled, so the hook never sees them. If the caller's
+   * AbortSignal fires during the subsequent backoff sleep, the retry is still
+   * abandoned (the hook reports intent-to-retry, not success). Keep the callback
+   * cheap and non-throwing: an exception thrown inside `onRetry` propagates out
+   * of the client call.
+   *
+   * Audit ref: L-3 in `BTX/audits/btx-challenges-sdk-audit-2026-05-23.md`.
+   */
+  onRetry?: (attempt: number, error: unknown, nextDelayMs: number) => void;
 }
 
 /**
@@ -279,13 +298,30 @@ export interface BtxClientOpts {
    * Values ≤ 0 are treated as "no override" — fall through to the next layer
    * (audit M-1 2026-05-23).
    *
+   * Keys may be either the **raw btxd RPC method name** or a **semantic
+   * shortcut** (added 0.3.0, audit L-4):
+   *
+   * | semantic | raw RPC method |
+   * |---|---|
+   * | `issue` | `getmatmulservicechallenge` |
+   * | `verify` | `verifymatmulserviceproof` |
+   * | `redeem` | `redeemmatmulserviceproof` |
+   * | `verifyBatch` | `verifymatmulserviceproofs` |
+   * | `redeemBatch` | `redeemmatmulserviceproofs` |
+   * | `solve` | `solvematmulservicechallenge` |
+   *
+   * Precedence: a raw-method key always wins over the semantic alias for the
+   * same method (raw is more specific). A `≤ 0` value at either level is
+   * skipped and resolution continues to the next layer.
+   *
    * Useful because RPCs have very different time profiles: `solvematmulservicechallenge`
    * on a mining-loaded btxd can take 15+ minutes ({@link https://github.com/btx-tools/btx-challenges-sdk see btxd-solver-mining-contention}),
-   * while `getmatmulservicechallenge` finishes in ~50 ms. Set
-   * `{ solvematmulservicechallenge: 1_000_000 }` to give the solver a long
-   * runway without bloating the client-wide default.
+   * while `getmatmulservicechallenge` finishes in ~50 ms. Set `{ solve: 1_000_000 }`
+   * (or the raw `{ solvematmulservicechallenge: 1_000_000 }`) to give the solver
+   * a long runway without bloating the client-wide default.
    *
-   * Audit ref: D-4 in `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`.
+   * Audit ref: D-4 in `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`;
+   * semantic shortcuts L-4 in `…-audit-2026-05-23.md`.
    */
   methodTimeouts?: Record<string, number>;
   /**
