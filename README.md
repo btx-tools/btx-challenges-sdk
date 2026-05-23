@@ -1,12 +1,77 @@
-# BTX challenges SDK — monorepo
+# BTX challenges SDK
 
-Workspace root for `@btx-tools/challenges-sdk` and companion middleware packages.
+> **Put a proof-of-work checkpoint in front of any endpoint — no CAPTCHA, no login, no API keys, no third-party service.**
 
-📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** — TypeDoc for every package below, regenerated on each push to `main`.
+A TypeScript SDK for **[BTX](https://btx.dev) service challenges**: your server asks a caller to burn a few seconds of _verifiable_ compute before you do something expensive or abusable. The work is defined and checked by the BTX chain — so there's no centralized issuer to trust, and a proof can't be replayed. Ships a typed RPC client, a solver, and **one-line middleware for Express, Fastify, and Hono**.
 
-🟢 **Stable — `1.0.0`.** The public API of all four packages is frozen under [SemVer](https://semver.org/); breaking changes require a `2.0.0`.
+📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** · 🟢 **Stable `1.0.0`** ([SemVer](https://semver.org/) — breaking changes require `2.0.0`) · MIT
+
+## What is this?
+
+### Why it exists
+
+You want to slow down bots, scraping, spam, or abuse on an endpoint — but the usual options each cost something:
+
+- a **CAPTCHA** annoys real users and is increasingly solved by bots anyway,
+- **accounts / API keys** add signup friction and a user database,
+- a **hosted anti-bot service** means a third party, a monthly bill, and a privacy trade-off.
+
+A BTX service challenge instead makes the _caller_ prove they spent a little real compute. It's **cheap to verify, costly to spam at scale, anchored to a public chain, and entirely self-hosted.**
+
+### How it works — issue → solve → redeem
+
+```
+Client ── POST /expensive ─────────────────▶  Server
+                                               │  no proof yet → issue a challenge
+Client ◀── 402 Payment Required ───────────────┤  (challenge rides in the X-BTX-Challenge header)
+   │
+   │  solve the matmul work-proof
+   │  (locally in JS, or — recommended — via a nearby non-mining btxd RPC)
+   ▼
+Client ── POST /expensive + proof headers ──▶  Server
+                                               │  redeem: verify + consume (anti-replay)
+Client ◀── 200 OK — your handler runs ─────────┘
+```
+
+The middleware runs this whole handshake for you. The server **never stores issued challenges** (the challenge echoes back in a header on retry), so it scales horizontally with no shared state.
+
+### One line to gate a route (Express)
+
+```ts
+import express from 'express';
+import { BtxChallengeClient } from '@btx-tools/challenges-sdk';
+import { btxAdmission } from '@btx-tools/middleware-express';
+
+const client = new BtxChallengeClient({
+  rpcUrl: 'http://127.0.0.1:19334', // a dedicated, NON-mining btxd
+  rpcAuth: { user: 'rpcuser', pass: 'rpcpass' },
+});
+
+const app = express();
+app.post(
+  '/v1/generate',
+  btxAdmission({
+    client,
+    purpose: 'ai_inference_gate',
+    resource: (req) => req.path,
+    subject: (req) => req.ip ?? 'anon',
+  }),
+  (req, res) => res.json({ ok: true }), // only runs after a valid proof is redeemed
+);
+```
+
+### Who it's for
+
+- **AI / inference APIs** gating expensive generations without a login wall.
+- **Agent / MCP gateways** — per-tool-call admission (see the sibling [`@btx-tools/mcp-gateway`](https://github.com/btx-tools/btx-mcp-gateway)).
+- **Anonymous forms / submission endpoints** that need rate-limiting without accounts.
+- Anyone replacing hCaptcha / reCAPTCHA-style gating with **self-hosted, chain-anchored proof-of-work** on the server side.
+
+> ℹ️ **Server-side, not a browser captcha.** See [What this SDK is (and isn't)](#what-this-sdk-is-and-isnt) below — the matmul proof is GPU-fast-mining-shaped, so production solving belongs on a server (or a nearby `btxd`), not a user's browser tab.
 
 ## Packages
+
+This repo is a monorepo: the core SDK plus three framework adapters (install only the ones you need).
 
 | Package                                                          | Description                                                          | Latest    |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------- | --------- |
@@ -84,7 +149,7 @@ pnpm -r test           # unit + integration tests
 
 ## Project links
 
-- Spec: [`BTX/ecosystem/btx-challenges-sdk-spec-2026-05-20.md`](../../Documents/BTX/ecosystem/btx-challenges-sdk-spec-2026-05-20.md) (private)
+- Design spec: internal — not public.
 - BTX dev portal: [btx.dev/develop](https://btx.dev/develop/)
 - RPC reference: [btx.dev/docs/rpc/service-challenges](https://btx.dev/docs/rpc/service-challenges)
 
