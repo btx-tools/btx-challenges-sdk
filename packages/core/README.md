@@ -7,7 +7,7 @@ TypeScript SDK for **BTX service challenges** — chain-anchored proof-of-work a
 
 📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** — full TypeDoc for this package and the middleware adapters.
 
-> **Status**: 0.3.0. RPC + pure-JS solver cross-validated byte-equal against btxd's own pinned test vectors; opt-in retry/backoff (`onRetry` hook) + per-method timeouts (raw or semantic keys) + `AbortSignal` plumbing. All audit findings closed. See [CHANGELOG](https://github.com/btx-tools/btx-challenges-sdk/blob/main/CHANGELOG.md).
+> **Status**: 🟢 **`1.0.0` — stable** (API frozen under SemVer). RPC + pure-JS solver cross-validated byte-equal against btxd's own pinned test vectors; opt-in retry/backoff (`onRetry` hook) + per-method timeouts (raw or semantic keys) + `AbortSignal` plumbing. All audit findings closed. See [CHANGELOG](https://github.com/btx-tools/btx-challenges-sdk/blob/main/CHANGELOG.md).
 
 ## What is this?
 

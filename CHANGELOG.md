@@ -4,6 +4,30 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-05-23
+
+**Stable API freeze.** All four `@btx-tools/*` SDK packages move to `1.0.0` together. The public API is now under [SemVer](https://semver.org/) — breaking changes require a `2.0.0`. **No code changes from `0.3.1`/`0.2.3`/`0.1.2`** — this release promotes the existing, audit-clean surface to a stability commitment.
+
+### Packages
+
+| Package                         | 1.0.0 from |
+| ------------------------------- | ---------- |
+| `@btx-tools/challenges-sdk`     | 0.3.1      |
+| `@btx-tools/middleware-express` | 0.2.3      |
+| `@btx-tools/middleware-fastify` | 0.1.2      |
+| `@btx-tools/middleware-hono`    | 0.1.2      |
+
+### Frozen public surface
+
+- **core** — `BtxChallengeClient` (`call`/`issue`/`verify`/`redeem`/`verifyBatch`/`redeemBatch`/`solve`, all with optional trailing `RpcCallOpts`), `Solver`, the six `Btx*Error` classes, and the option/challenge/result types (`BtxClientOpts`, `RetryOptions`, `RpcCallOpts`, `IssueParams`, the `Challenge*` type family, `SolverOptions`/`SolverMode`/`SolveJsOptions`, `SolverOutput`, `VerifyResult`/`VerifyReason`, `BatchEntry`/`BatchResult`). Verified: no internal symbols leak (e.g. `CallerAbortError` stays private).
+- **middleware (express / fastify / hono)** — `btxAdmission`, `BtxAdmissionOpts`, `StringOrFn`, the `HEADER_*` constants (+ hono's `BtxAdmissionVariables`). Peer dependency pinned to `@btx-tools/challenges-sdk@^1.0.0`.
+
+### Stability notes
+
+- Backwards-compatible with `0.3.x` consumers — no signature or behavior changes; upgrading is a version bump.
+- All findings across every SDK audit + the `mcp-gateway` audit are closed.
+- API reference: https://btx-tools.github.io/btx-challenges-sdk/
+
 ## [0.3.1] - 2026-05-23
 
 Audit-resolution release (deep audit of `0.3.0` + Phase 5 docs). All fixes are backwards-compatible; no behavior change for existing code beyond a stricter retry-delay cap.

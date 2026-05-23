@@ -1,6 +1,6 @@
 {
   "name": "@btx-tools/middleware-fastify",
-  "version": "0.1.2",
+  "version": "1.0.0",
   "description": "Fastify plugin for @btx-tools/challenges-sdk — drop-in BTX service-challenge admission gate",
   "author": "visitor-code <visitor@friction.market>",
   "license": "MIT",
@@ -36,7 +36,7 @@
     "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
-    "@btx-tools/challenges-sdk": "^0.0.4 || ^0.1.0 || ^0.2.0 || ^0.3.0",
+    "@btx-tools/challenges-sdk": "^1.0.0",
     "fastify": "^4.0.0 || ^5.0.0"
   },
   "dependencies": {

@@ -4,14 +4,16 @@ Workspace root for `@btx-tools/challenges-sdk` and companion middleware packages
 
 📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** — TypeDoc for every package below, regenerated on each push to `main`.
 
+🟢 **Stable — `1.0.0`.** The public API of all four packages is frozen under [SemVer](https://semver.org/); breaking changes require a `2.0.0`.
+
 ## Packages
 
 | Package                                                          | Description                                                          | Latest    |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------- | --------- |
-| [`@btx-tools/challenges-sdk`](./packages/core)                   | Core RPC client + Solver (RPC + pure-JS modes) + algorithm port      | **0.3.1** |
-| [`@btx-tools/middleware-express`](./packages/middleware-express) | Express middleware adapter                                           | **0.2.3** |
-| [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter                                               | **0.1.2** |
-| [`@btx-tools/middleware-hono`](./packages/middleware-hono)       | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | **0.1.2** |
+| [`@btx-tools/challenges-sdk`](./packages/core)                   | Core RPC client + Solver (RPC + pure-JS modes) + algorithm port      | **1.0.0** |
+| [`@btx-tools/middleware-express`](./packages/middleware-express) | Express middleware adapter                                           | **1.0.0** |
+| [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter                                               | **1.0.0** |
+| [`@btx-tools/middleware-hono`](./packages/middleware-hono)       | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | **1.0.0** |
 
 ### Sibling packages (separate repos)
 
@@ -19,7 +21,17 @@ Workspace root for `@btx-tools/challenges-sdk` and companion middleware packages
 | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | [`@btx-tools/mcp-gateway`](https://www.npmjs.com/package/@btx-tools/mcp-gateway) | **MCP server framework** that gates every tool invocation behind a BTX service-challenge proof — for agentic AI admission control. Companion to this SDK. | [btx-tools/btx-mcp-gateway](https://github.com/btx-tools/btx-mcp-gateway) |
 
-Roadmap to `1.0.0`: private — see internal `BTX/ecosystem/sdk-finishing-plan-2026-05-22.md`.
+### Post-1.0 roadmap
+
+`1.0.0` froze the server-side admission-middleware API. Candidate additive work for `1.x`/beyond (none breaking):
+
+- **`@btx-tools/mcp-gateway` `1.0.0`** — promote the agent-admission gateway to stable alongside this family.
+- **Cloudflare Worker template** — deploy-ready edge gate using `middleware-hono`.
+- **WordPress plugin** (`wp-btx-gate`) — form/login admission for the largest CMS surface.
+- **Python SDK** (`btx-challenges-py`) — server-side parity for Python stacks.
+- **LangChain / LlamaIndex bindings** — agent-tool admission for the popular orchestration frameworks.
+
+Browser-side solving remains out of scope until the BTX protocol offers a browser-friendly proof primitive (see `USE-CASES.md`).
 
 ## Quickstart (for SDK consumers)
 
