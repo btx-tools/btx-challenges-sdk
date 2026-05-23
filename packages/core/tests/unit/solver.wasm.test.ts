@@ -14,7 +14,12 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { Solver, challengeToWasmArgs, solveWithWasmCtor } from '../../src/solver.js';
+import {
+  Solver,
+  challengeToWasmArgs,
+  resolveWasmCtor,
+  solveWithWasmCtor,
+} from '../../src/solver.js';
 import { solveJs } from '../../src/matmul/pow.js';
 import type { Challenge } from '../../src/index.js';
 
@@ -175,6 +180,39 @@ describe('WASM proof parity (against the built crate artifact)', () => {
       expect(wasmOut.digest_hex).toHaveLength(64);
     },
   );
+});
+
+describe('resolveWasmCtor — module-shape handling (audit V-1)', () => {
+  class FakeSolver {}
+
+  it('returns the ctor from a nodejs-target module (default = module object)', async () => {
+    const mod = { WasmSolver: FakeSolver, default: { WasmSolver: FakeSolver } };
+    await expect(resolveWasmCtor(mod)).resolves.toBe(FakeSolver);
+  });
+
+  it('runs the web-target async init() then returns the named ctor', async () => {
+    let initRan = false;
+    const init = async () => {
+      initRan = true;
+    };
+    const mod = { default: Object.assign(init, {}), WasmSolver: FakeSolver };
+    await expect(resolveWasmCtor(mod)).resolves.toBe(FakeSolver);
+    expect(initRan).toBe(true);
+  });
+
+  it('propagates a failing web-target init() (e.g. file-URL fetch in plain Node)', async () => {
+    const mod = {
+      default: async () => {
+        throw new Error('fetch of wasm via import.meta.url is not supported');
+      },
+      WasmSolver: FakeSolver,
+    };
+    await expect(resolveWasmCtor(mod)).rejects.toThrow(/fetch of wasm/);
+  });
+
+  it('throws when no WasmSolver constructor is exported', async () => {
+    await expect(resolveWasmCtor({})).rejects.toThrow(/WasmSolver constructor/);
+  });
 });
 
 describe('mode: "wasm" — graceful degradation', () => {

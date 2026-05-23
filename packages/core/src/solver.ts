@@ -16,13 +16,13 @@ import type { Challenge, SolverOutput } from './types.js';
  *
  * - `'wasm'` — solve locally with the optional
  *   [`@btx-tools/matmul-wasm`](https://github.com/btx-tools/btx-challenges-wasm)
- *   kernel (byte-identical proof to `'pure-js'`, ~24× faster). No node required;
- *   runs wherever the installed `@btx-tools/matmul-wasm` build loads (its
- *   wasm-pack target determines Node vs browser/bundler support). Throws a clear
- *   error if the optional package isn't installed. Still **far slower than
- *   native** at the production `n=512` (a browser pool floor is ~16 s) — great
- *   for server/edge solving without a btxd, not a casual per-request browser
- *   captcha.
+ *   kernel (byte-identical proof to `'pure-js'`, ~24× faster). No node required.
+ *   The published build targets **browsers/bundlers** (Vite, Next, Workers); in
+ *   **plain Node**, build the package's `nodejs` target from source or solve via
+ *   `'rpc'`. Throws a clear, distinct error if the package isn't installed vs
+ *   installed-but-uninitializable-here. Still **far slower than native** at the
+ *   production `n=512` (a browser pool floor is ~16 s) — great for browser/edge
+ *   solving without a btxd, not a casual per-request browser captcha.
  *
  * - `'pure-js'` — solve locally with a pure-TypeScript MatMul implementation.
  *   No node and no optional package required, browser-compatible. **Slow**:
@@ -134,10 +134,10 @@ export class Solver {
       case 'pure-js':
         return solveViaPureJs(challenge, opts);
       case 'auto': {
-        // rpc (if a node is reachable) → wasm (if the kernel is installed) → pure-js.
+        // rpc (if a node is reachable) → wasm (if the kernel is usable) → pure-js.
         if (opts.rpcClient) return solveViaRpc(challenge, opts);
-        const Ctor = await loadWasmCtor();
-        if (Ctor) return solveWithWasmCtor(challenge, Ctor, opts.wasm);
+        const load = await loadWasm();
+        if (load.kind === 'ok') return solveWithWasmCtor(challenge, load.Ctor, opts.wasm);
         return solveViaPureJs(challenge, opts);
       }
       default: {
@@ -269,47 +269,80 @@ export function solveWithWasmCtor(
   return { nonce64_hex, digest_hex, proof: { challenge, nonce64_hex, digest_hex } };
 }
 
-// Memoized probe result (audit H-1): `undefined` = not yet probed, `null` =
-// package absent. Kept at module scope so `'auto'` attempts the optional import
-// at most once per process instead of on every solve.
-let cachedWasmCtor: WasmSolverCtor | null | undefined;
+/** Outcome of probing the optional `@btx-tools/matmul-wasm` kernel. */
+type WasmLoad =
+  | { kind: 'ok'; Ctor: WasmSolverCtor }
+  | { kind: 'absent' } // package not installed / not resolvable
+  | { kind: 'init-failed'; cause: unknown }; // installed, but init() threw or no ctor
 
 /**
- * Best-effort load of the optional `@btx-tools/matmul-wasm` kernel. Returns the
- * `WasmSolver` constructor, or `null` if the package isn't installed (so
- * `'auto'` can fall through to pure-js). Memoized. The specifier is held in a
- * variable so the bundler/`tsc` treat it as a runtime-only dependency, never a
- * build-time one.
+ * Resolve a `WasmSolver` constructor from an already-imported module, running
+ * the `web` target's async `init()` if present. Separated from the import so it
+ * is unit-testable with synthetic module shapes. Throws if the module can't
+ * yield a usable constructor (init threw, or no `WasmSolver` export).
+ *
+ * **Node caveat (audit V-1):** the published build targets the `web` wasm-pack
+ * shape, whose `init()` resolves the `.wasm` via `import.meta.url` — works in
+ * browsers/bundlers (Vite, Next, Workers), but in **plain Node** that fetch
+ * fails. Plain-Node consumers should build the package's `nodejs` target from
+ * source or solve via `mode: 'rpc'`. Exposed for tests.
  */
-async function loadWasmCtor(): Promise<WasmSolverCtor | null> {
-  if (cachedWasmCtor !== undefined) return cachedWasmCtor;
-  const spec = '@btx-tools/matmul-wasm';
-  try {
-    const mod = (await import(spec)) as Record<string, unknown> & {
-      default?: unknown;
-      WasmSolver?: unknown;
-    };
-    // The `web` wasm-pack target needs its async init() to run before use; the
-    // `nodejs` target loads synchronously (no init, WasmSolver is direct).
-    if (typeof mod.default === 'function') {
-      await (mod.default as () => Promise<unknown>)();
-    }
-    const fromDefault = (mod.default as { WasmSolver?: unknown } | undefined)?.WasmSolver;
-    const Ctor = mod.WasmSolver ?? fromDefault;
-    cachedWasmCtor = (Ctor as WasmSolverCtor) ?? null;
-  } catch {
-    cachedWasmCtor = null;
+export async function resolveWasmCtor(mod: unknown): Promise<WasmSolverCtor> {
+  const m = mod as { default?: unknown; WasmSolver?: unknown };
+  if (typeof m.default === 'function') {
+    await (m.default as () => Promise<unknown>)();
   }
-  return cachedWasmCtor;
+  const fromDefault = (m.default as { WasmSolver?: unknown } | undefined)?.WasmSolver;
+  const Ctor = m.WasmSolver ?? fromDefault;
+  if (typeof Ctor !== 'function') {
+    throw new Error('@btx-tools/matmul-wasm did not export a WasmSolver constructor');
+  }
+  return Ctor as WasmSolverCtor;
+}
+
+// Memoized probe (audit H-1): `undefined` = not yet probed. Kept at module scope
+// so `'auto'` attempts the optional import at most once per process.
+let cachedLoad: WasmLoad | undefined;
+
+/**
+ * Best-effort load of the optional kernel. Distinguishes `absent` (not
+ * installed → `'auto'` falls through to pure-js) from `init-failed` (installed
+ * but unusable in this environment) so the explicit-mode error can be accurate.
+ * The specifier is held in a variable so the bundler/`tsc` treat it as a
+ * runtime-only dependency, never a build-time one.
+ */
+async function loadWasm(): Promise<WasmLoad> {
+  if (cachedLoad !== undefined) return cachedLoad;
+  const spec = '@btx-tools/matmul-wasm';
+  let mod: unknown;
+  try {
+    mod = await import(spec);
+  } catch {
+    cachedLoad = { kind: 'absent' };
+    return cachedLoad;
+  }
+  try {
+    cachedLoad = { kind: 'ok', Ctor: await resolveWasmCtor(mod) };
+  } catch (cause) {
+    cachedLoad = { kind: 'init-failed', cause };
+  }
+  return cachedLoad;
 }
 
 async function solveViaWasm(challenge: Challenge, opts: SolverOptions): Promise<SolverOutput> {
-  const Ctor = await loadWasmCtor();
-  if (!Ctor) {
+  const load = await loadWasm();
+  if (load.kind === 'ok') return solveWithWasmCtor(challenge, load.Ctor, opts.wasm);
+  if (load.kind === 'absent') {
     throw new Error(
       'Solver.solve: mode="wasm" requires the optional @btx-tools/matmul-wasm package. ' +
         'Install it (e.g. `npm i @btx-tools/matmul-wasm`), or use mode "rpc" / "pure-js".',
     );
   }
-  return solveWithWasmCtor(challenge, Ctor, opts.wasm);
+  // init-failed: installed, but couldn't initialize in this environment.
+  const cause = load.cause instanceof Error ? load.cause.message : String(load.cause);
+  throw new Error(
+    'Solver.solve: mode="wasm" found @btx-tools/matmul-wasm but could not initialize it here. ' +
+      'The published build targets browsers/bundlers (Vite, Next, Workers); in plain Node, build ' +
+      `the package's nodejs target from source or use mode "rpc" / "pure-js". (cause: ${cause})`,
+  );
 }

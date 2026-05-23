@@ -31,6 +31,15 @@ mode + optional dependency); existing consumers are unaffected unless they opt i
   pure-js outcomes are unchanged; proofs are identical, just faster. The optional
   import is probed at most once per process.
 
+### Notes
+
+- The published `@btx-tools/matmul-wasm` build targets **browsers/bundlers**
+  (Vite, Next, Workers). In **plain Node**, its `init()` can't fetch the `.wasm`
+  via `import.meta.url` — `mode: 'wasm'` then throws a distinct
+  "found but couldn't initialize here" error (vs the "not installed" error), and
+  `mode: 'auto'` quietly falls through to pure-js. Plain-Node consumers should
+  build the package's `nodejs` target from source or solve via `mode: 'rpc'`.
+
 ## [1.0.3] - 2026-05-23 — `@btx-tools/challenges-sdk` (code docs)
 
 Source-doc clarity; no behavior change. Republished so the `.d.ts` (IDE hover) carries it.
