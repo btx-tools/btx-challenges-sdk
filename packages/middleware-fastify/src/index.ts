@@ -79,7 +79,7 @@ export const HEADER_PROOF_DIGEST = 'x-btx-proof-digest';
 // Types
 // ----------------------------------------------------------------------------
 
-type StringOrFn = string | ((req: FastifyRequest) => string);
+export type StringOrFn = string | ((req: FastifyRequest) => string);
 
 /** Options for {@link btxAdmission}. */
 export interface BtxAdmissionOpts {

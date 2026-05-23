@@ -740,6 +740,26 @@ describe('BtxChallengeClient — L-3 onRetry hook (audit 2026-05-23, shipped 0.3
     ).rejects.toBeInstanceOf(BtxHttpError);
     expect(onRetry).not.toHaveBeenCalled();
   });
+
+  it('L-3: an error thrown inside onRetry propagates out of the client call', async () => {
+    server.use(http.post(RPC_URL, () => HttpResponse.text('boom', { status: 503 })));
+    const sentinel = new Error('onRetry exploded');
+    const client = new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'u', pass: 'p' },
+      retry: {
+        max: 3,
+        baseDelayMs: 1,
+        onRetry: () => {
+          throw sentinel;
+        },
+      },
+    });
+    // The callback throw surfaces to the caller, masking the retryable BtxHttpError.
+    await expect(client.issue({ purpose: 'rate_limit', resource: 'r', subject: 's' })).rejects.toBe(
+      sentinel,
+    );
+  });
 });
 
 describe('BtxChallengeClient — L-4 semantic methodTimeouts aliases (audit 2026-05-23, shipped 0.3.0)', () => {

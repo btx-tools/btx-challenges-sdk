@@ -219,7 +219,12 @@ export interface RetryOptions {
    * schedule delays past the process lifetime. Default 500 ms.
    */
   baseDelayMs?: number;
-  /** If `true`, adds `random(0, baseDelayMs)` of jitter to each delay. Default `false`. */
+  /**
+   * If `true`, adds `random(0, baseDelayMs)` of jitter to each delay. Default
+   * `false`. The 60 s cap (see {@link baseDelayMs}) is applied **after** jitter,
+   * so the delay slept — and the value passed to {@link onRetry} — never exceeds
+   * 60 s.
+   */
   jitter?: boolean;
   /**
    * Observability hook fired once per scheduled retry, **before** the backoff

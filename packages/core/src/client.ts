@@ -35,14 +35,20 @@ const MAX_RETRY_DELAY_MS = 60_000;
  * instead of the verbose `{ solvematmulservicechallenge: 1_000_000 }`. A raw
  * method key always takes precedence over its semantic alias.
  */
-const SEMANTIC_TIMEOUT_ALIAS: Readonly<Record<string, string>> = {
-  getmatmulservicechallenge: 'issue',
-  verifymatmulserviceproof: 'verify',
-  redeemmatmulserviceproof: 'redeem',
-  verifymatmulserviceproofs: 'verifyBatch',
-  redeemmatmulserviceproofs: 'redeemBatch',
-  solvematmulservicechallenge: 'solve',
-};
+// Null-prototype (audit L-1) so a lookup with an inherited key like
+// `__proto__` / `constructor` returns `undefined`, not an Object.prototype
+// member — keeps the `aliasKey !== undefined` guard sound for any method name.
+const SEMANTIC_TIMEOUT_ALIAS: Readonly<Record<string, string>> = Object.assign(
+  Object.create(null) as Record<string, string>,
+  {
+    getmatmulservicechallenge: 'issue',
+    verifymatmulserviceproof: 'verify',
+    redeemmatmulserviceproof: 'redeem',
+    verifymatmulserviceproofs: 'verifyBatch',
+    redeemmatmulserviceproofs: 'redeemBatch',
+    solvematmulservicechallenge: 'solve',
+  },
+);
 
 /**
  * Sentinel error thrown internally when an external AbortSignal fires. Caught
@@ -181,21 +187,25 @@ export class BtxChallengeClient {
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) {
-        // M-2: cap exponential backoff at 60s so a high `max` doesn't schedule
-        // a retry past the process lifetime.
+        // M-2: cap exponential backoff so a high `max` doesn't schedule a retry
+        // past the process lifetime.
         const rawDelay = baseDelayMs * Math.pow(2, attempt - 1);
-        const delay = Math.min(rawDelay, MAX_RETRY_DELAY_MS);
+        const cappedBase = Math.min(rawDelay, MAX_RETRY_DELAY_MS);
         // M-3: jitter — not security-sensitive; Math.random is appropriate here
         // (matches the nextRequestId fallback convention per audit A-3).
-        const jittered = retry.jitter ? delay + Math.random() * baseDelayMs : delay;
+        const jittered = retry.jitter ? cappedBase + Math.random() * baseDelayMs : cappedBase;
+        // L-2 (0.3.1): cap AFTER jitter so the actual delay slept — and the value
+        // reported to onRetry — never exceeds MAX_RETRY_DELAY_MS, matching the
+        // documented "capped at 60s" (jitter previously could push it over).
+        const delay = Math.min(jittered, MAX_RETRY_DELAY_MS);
         // L-3 (0.3.0): observability hook — fired before the backoff sleep with
         // the exact delay about to be slept and the retryable error that
         // triggered this retry. `attempt` is 1-indexed (1 = first retry).
-        retry.onRetry?.(attempt, lastErr, jittered);
+        retry.onRetry?.(attempt, lastErr, delay);
         try {
           // 0.2.0: backoff sleep honors external abort signal — caller-cancel
           // mid-retry exits the loop without sending another request.
-          await abortableDelay(jittered, opts?.signal);
+          await abortableDelay(delay, opts?.signal);
         } catch (err) {
           if (err instanceof CallerAbortError) {
             throw new BtxNetworkError(err, method);

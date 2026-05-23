@@ -4,7 +4,7 @@ Drop-in **Hono** admission gate backed by BTX service challenges. Works on Node,
 
 📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** — TypeDoc for all `@btx-tools/*` SDK packages.
 
-> **End-to-end example**: a runnable adopter example is in [`examples/02-express-gate`](../../examples/02-express-gate) (Express-based; the wiring shape is structurally identical for Hono — swap the route + middleware call). A Hono-native parity example covering both Node and edge deploy is queued for the SDK Phase 3.5 roadmap.
+> **End-to-end example**: a runnable adopter example is in [`examples/02-express-gate`](https://github.com/btx-tools/btx-challenges-sdk/tree/main/examples/02-express-gate) (Express-based; the wiring shape is structurally identical for Hono — swap the route + middleware call). A Hono-native parity example covering both Node and edge deploy is queued for the SDK Phase 3.5 roadmap.
 
 ```bash
 pnpm add @btx-tools/middleware-hono @btx-tools/challenges-sdk hono

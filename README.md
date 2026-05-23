@@ -8,10 +8,10 @@ Workspace root for `@btx-tools/challenges-sdk` and companion middleware packages
 
 | Package                                                          | Description                                                          | Latest    |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------- | --------- |
-| [`@btx-tools/challenges-sdk`](./packages/core)                   | Core RPC client + Solver (RPC + pure-JS modes) + algorithm port      | **0.3.0** |
-| [`@btx-tools/middleware-express`](./packages/middleware-express) | Express middleware adapter                                           | **0.2.2** |
-| [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter                                               | **0.1.1** |
-| [`@btx-tools/middleware-hono`](./packages/middleware-hono)       | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | **0.1.1** |
+| [`@btx-tools/challenges-sdk`](./packages/core)                   | Core RPC client + Solver (RPC + pure-JS modes) + algorithm port      | **0.3.1** |
+| [`@btx-tools/middleware-express`](./packages/middleware-express) | Express middleware adapter                                           | **0.2.3** |
+| [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter                                               | **0.1.2** |
+| [`@btx-tools/middleware-hono`](./packages/middleware-hono)       | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | **0.1.2** |
 
 ### Sibling packages (separate repos)
 
@@ -49,13 +49,13 @@ Then see the per-package README:
 
 ## Examples
 
-Three runnable end-to-end examples under [`examples/`](./examples/):
+Three runnable end-to-end examples under [`examples/`](https://github.com/btx-tools/btx-challenges-sdk/tree/main/examples/):
 
-| Path                                                           | Stack                          | What it shows                                                                                                                      | Status                         |
-| -------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| [`examples/01-basic-roundtrip`](./examples/01-basic-roundtrip) | Node + tsx                     | Minimal `issue → Solver.solve → redeem` walk-through, both pure-JS and RPC modes                                                   | ✅ Adopter-ready (server-side) |
-| [`examples/02-express-gate`](./examples/02-express-gate)       | Node + Express + tsx           | Full Express server with `btxAdmission` on `POST /v1/generate`, plus a Node client driving the 402 → solve → 200 → 403-replay flow | ✅ Adopter-ready (server-side) |
-| [`examples/03-browser-solver`](./examples/03-browser-solver)   | Vite + TypeScript + Web Worker | **Demonstrates the wire protocol** from a browser. **NOT a production captcha** — see [USE-CASES.md](./USE-CASES.md).              | ⚠️ Reference only              |
+| Path                                                                                                                   | Stack                          | What it shows                                                                                                                      | Status                         |
+| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| [`examples/01-basic-roundtrip`](https://github.com/btx-tools/btx-challenges-sdk/tree/main/examples/01-basic-roundtrip) | Node + tsx                     | Minimal `issue → Solver.solve → redeem` walk-through, both pure-JS and RPC modes                                                   | ✅ Adopter-ready (server-side) |
+| [`examples/02-express-gate`](https://github.com/btx-tools/btx-challenges-sdk/tree/main/examples/02-express-gate)       | Node + Express + tsx           | Full Express server with `btxAdmission` on `POST /v1/generate`, plus a Node client driving the 402 → solve → 200 → 403-replay flow | ✅ Adopter-ready (server-side) |
+| [`examples/03-browser-solver`](https://github.com/btx-tools/btx-challenges-sdk/tree/main/examples/03-browser-solver)   | Vite + TypeScript + Web Worker | **Demonstrates the wire protocol** from a browser. **NOT a production captcha** — see [USE-CASES.md](./USE-CASES.md).              | ⚠️ Reference only              |
 
 Each `examples/<n>/README.md` has install + run instructions.
 

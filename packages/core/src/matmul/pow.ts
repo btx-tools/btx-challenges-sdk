@@ -29,7 +29,7 @@ import { canonicalMatMul } from './transcript.js';
 
 const MAX_U64 = (1n << 64n) - 1n;
 
-/** Options for {@link solveJs}. */
+/** Options for the pure-JS solver (`Solver.solve` with `mode: 'pure-js'`). */
 export interface SolveJsOptions {
   /** Max nonces to try before giving up. Default 1_000_000. */
   maxTries?: number;

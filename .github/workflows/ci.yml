@@ -38,12 +38,13 @@ jobs:
         run: pnpm -r type-check
 
       - name: Format check (prettier)
-        # Audit finding G-4. Catches style drift before it lands on main.
-        # Single root invocation scoped to packages/* — `pnpm -r exec` also ran
-        # inside examples/* (workspace members with no tests/ dir), which made
-        # prettier exit 2 ("no files matching tests/**/*.ts"). Root glob over
-        # packages/* matches at least one file per arg, so no false "no files".
-        run: pnpm exec prettier --check "packages/*/src/**/*.ts" "packages/*/tests/**/*.ts"
+        # Audit finding G-4. Single non-empty glob over packages/** — prettier
+        # exits 2 if ANY glob arg matches zero files, so the earlier two-arg form
+        # (src + tests) re-broke whenever a package lacked one of those dirs
+        # (audit M-3, 2026-05-23). One `**/*.ts` glob always matches; dist/.d.ts
+        # + node_modules are excluded via .prettierignore, and examples/ is
+        # outside the packages/** scope.
+        run: pnpm exec prettier --check "packages/**/*.ts"
 
       - name: Pack dry-run
         # Audit finding G-3. Surfaces publish-time tarball issues (oversized

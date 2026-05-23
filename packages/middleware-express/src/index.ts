@@ -56,7 +56,7 @@ export const HEADER_PROOF_DIGEST = 'X-BTX-Proof-Digest';
 // Types
 // ----------------------------------------------------------------------------
 
-type StringOrFn = string | ((req: Request) => string);
+export type StringOrFn = string | ((req: Request) => string);
 
 /** Options for {@link btxAdmission}. */
 export interface BtxAdmissionOpts {

@@ -78,7 +78,7 @@ export const HEADER_PROOF_DIGEST = 'x-btx-proof-digest';
  * function over Context, or an async function for cases where the resolver
  * needs to await `c.req.json()` (Hono request body is a stream until consumed).
  */
-type StringOrFn = string | ((c: Context) => string) | ((c: Context) => Promise<string>);
+export type StringOrFn = string | ((c: Context) => string) | ((c: Context) => Promise<string>);
 
 /**
  * Hono `Variables` shape expected on the context. Apps that consume this

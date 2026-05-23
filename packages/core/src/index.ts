@@ -1,5 +1,5 @@
 /**
- * @btx/challenges-sdk
+ * @btx-tools/challenges-sdk
  *
  * TypeScript SDK for BTX service challenges — chain-anchored proof-of-work
  * admission control for APIs, agent gateways, and form submissions.
@@ -8,7 +8,8 @@
  */
 
 export { BtxChallengeClient } from './client.js';
-export { Solver } from './solver.js';
+export { Solver, type SolverOptions, type SolverMode } from './solver.js';
+export type { SolveJsOptions } from './matmul/pow.js';
 export {
   BtxError,
   BtxHttpError,

@@ -9,7 +9,7 @@ Drop-in Express admission gate backed by [BTX](https://btx.dev) service challeng
 
 > **Status**: 0.2.0. Requires `@btx-tools/challenges-sdk@^0.0.1`. **Breaking change from 0.1.x**: `Express.Request.btxResult` was renamed to `req.btx.result` (see [CHANGELOG](./CHANGELOG.md#020---2026-05-22) for migration).
 
-> **End-to-end example**: clone the repo and run [`examples/02-express-gate`](../../examples/02-express-gate) for a working server + client pair you can copy from. Walks the full 402 → solve → 200 → 403-replay flow against a live btxd.
+> **End-to-end example**: clone the repo and run [`examples/02-express-gate`](https://github.com/btx-tools/btx-challenges-sdk/tree/main/examples/02-express-gate) for a working server + client pair you can copy from. Walks the full 402 → solve → 200 → 403-replay flow against a live btxd.
 
 ## Install
 

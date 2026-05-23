@@ -45,7 +45,7 @@ export interface SolverOptions {
  *
  * @example Server-side (Node, RPC mode)
  * ```typescript
- * import { BtxChallengeClient, Solver } from '@btx/challenges-sdk';
+ * import { BtxChallengeClient, Solver } from '@btx-tools/challenges-sdk';
  *
  * const client = new BtxChallengeClient({
  *   rpcUrl: 'http://127.0.0.1:19332',
@@ -68,7 +68,7 @@ export interface SolverOptions {
  *
  * @example Browser-side (pure-JS mode)
  * ```typescript
- * import { Solver } from '@btx/challenges-sdk';
+ * import { Solver } from '@btx-tools/challenges-sdk';
  *
  * // Solve a challenge with no server-side help. Slow at default difficulty;
  * // for production browser use cases, calibrate via `target_solve_time_s`.

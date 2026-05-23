@@ -4,6 +4,27 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-23
+
+Audit-resolution release (deep audit of `0.3.0` + Phase 5 docs). All fixes are backwards-compatible; no behavior change for existing code beyond a stricter retry-delay cap.
+
+### Fixed — `@btx-tools/challenges-sdk` (0.3.0 → 0.3.1)
+
+- **M-1: API-reference docs shipped a broken install scope.** Source JSDoc in `src/index.ts` + `src/solver.ts` still referenced the old, non-existent `@btx/challenges-sdk` scope — which TypeDoc rendered into the published API reference (an uninstallable `npm install`). Corrected to `@btx-tools/challenges-sdk`.
+- **M-2: `SolverOptions` now exported.** It was referenced by `Solver.solve` but not re-exported, so it was dropped from the generated docs and unavailable to consumers. Now `export`ed from the package root.
+- **L-1: `SEMANTIC_TIMEOUT_ALIAS` is now a null-prototype object.** A `methodTimeouts` lookup keyed by an inherited name (`__proto__`, `constructor`, …) previously returned an `Object.prototype` member instead of `undefined`. Not exploitable (method names come from caller code, not request data), but a soundness wart — fixed with `Object.create(null)`.
+- **L-2: retry-delay cap now applied after jitter.** With `jitter: true`, the delay (and the value reported to `onRetry`) could reach `60s + baseDelayMs`. The 60s cap is now applied last, so the slept delay never exceeds it — matching the documented behavior.
+
+### Fixed — middleware (`-express` 0.2.2 → 0.2.3, `-fastify`/`-hono` 0.1.1 → 0.1.2)
+
+- **M-2: `StringOrFn` now exported** from each adapter — it's the type of the `purpose`/`resource`/`subject` resolver options but was previously package-private (undocumented).
+- **L-4: peer-dependency range widened** to `… || ^0.2.0 || ^0.3.0` so installing alongside core `0.2.x`/`0.3.x` no longer emits an unmet-peer warning.
+
+### Tooling
+
+- **M-3: CI prettier check made structurally robust.** The `pnpm -r exec prettier --check "src/**/*.ts" "tests/**/*.ts"` form exited 2 ("no files matching") for any workspace member lacking one of those dirs (e.g. `examples/*`, or a future package without `tests/`). Replaced with a single `prettier --check "packages/**/*.ts"` glob + a new `.prettierignore` (excludes `dist`/`node_modules`/`docs-site`).
+- **L-3: added a regression test** pinning the documented "an error thrown inside `onRetry` propagates out of the client call" behavior.
+
 ## [0.3.0] - 2026-05-23
 
 Minor release — lands the two additive API features deferred from the `0.1.1`/`0.2.0` audits (L-3 + L-4). Backwards-compatible with `0.2.0`: both are optional, no signature changes, no behavior change for code that doesn't opt in.
