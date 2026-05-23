@@ -4,6 +4,33 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
+## [1.1.0] - `@btx-tools/challenges-sdk` (WASM solver mode) — pending publish
+
+Adds an optional **WASM solver mode** backed by
+[`@btx-tools/matmul-wasm`](https://github.com/btx-tools/btx-challenges-wasm) — a
+byte-exact Rust→WASM port of btxd's matmul PoW. **Backward-compatible** (additive
+mode + optional dependency); existing consumers are unaffected unless they opt in.
+
+> **Honest framing:** the WASM kernel is the **fastest JS-environment solver**
+> (~24× the pure-JS path) for **server / edge / Node** solving without a btxd. It
+> is **not** a casual browser captcha — at the live `n=512` a browser pool floor
+> is ~16 s. See the kernel's README for the measured perf.
+
+### Added
+
+- **`mode: 'wasm'`** on `Solver.solve` + `WasmSolveOptions` (`maxTries`,
+  `nonceStart`). Produces a proof byte-identical to `'pure-js'`. Throws a clear,
+  catchable error if the optional `@btx-tools/matmul-wasm` package isn't installed.
+- `@btx-tools/matmul-wasm` as an **`optionalDependency`** (`^0.1.0`).
+
+### Changed
+
+- **`mode: 'auto'` now prefers the WASM kernel when installed** — cascade is
+  `rpc` (if `rpcClient`) → `wasm` (if `@btx-tools/matmul-wasm` resolves) → `pure-js`.
+  Previously `auto` with no client went straight to pure-js. RPC / explicit
+  pure-js outcomes are unchanged; proofs are identical, just faster. The optional
+  import is probed at most once per process.
+
 ## [1.0.3] - 2026-05-23 — `@btx-tools/challenges-sdk` (code docs)
 
 Source-doc clarity; no behavior change. Republished so the `.d.ts` (IDE hover) carries it.
