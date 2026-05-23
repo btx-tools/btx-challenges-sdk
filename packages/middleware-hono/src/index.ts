@@ -145,8 +145,8 @@ export function btxAdmission(opts: BtxAdmissionOpts): MiddlewareHandler {
 function defaultIsProofPresent(c: Context): boolean {
   return Boolean(
     c.req.header(HEADER_CHALLENGE) &&
-      c.req.header(HEADER_PROOF_NONCE) &&
-      c.req.header(HEADER_PROOF_DIGEST),
+    c.req.header(HEADER_PROOF_NONCE) &&
+    c.req.header(HEADER_PROOF_DIGEST),
   );
 }
 

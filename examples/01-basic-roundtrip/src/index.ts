@@ -74,7 +74,9 @@ async function pureJsRoundtrip(): Promise<void> {
   console.log('[solve] starting pure-JS solve (this can take 7-10 min on an M-series Mac)...');
   const t1 = Date.now();
   const proof = await Solver.solve(challenge, { mode: 'pure-js' });
-  console.log(`[solve] nonce=${proof.nonce64_hex} digest=${proof.digest_hex.slice(0, 16)}... in ${ms(t1)}`);
+  console.log(
+    `[solve] nonce=${proof.nonce64_hex} digest=${proof.digest_hex.slice(0, 16)}... in ${ms(t1)}`,
+  );
 
   const t2 = Date.now();
   const result = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);
@@ -121,7 +123,9 @@ async function rpcRoundtrip(): Promise<void> {
   console.log('[solve] delegating to btxd via solvematmulservicechallenge...');
   const t1 = Date.now();
   const proof = await Solver.solve(challenge, { mode: 'rpc', rpcClient: client });
-  console.log(`[solve] nonce=${proof.nonce64_hex} digest=${proof.digest_hex.slice(0, 16)}... in ${ms(t1)}`);
+  console.log(
+    `[solve] nonce=${proof.nonce64_hex} digest=${proof.digest_hex.slice(0, 16)}... in ${ms(t1)}`,
+  );
 
   const t2 = Date.now();
   const result = await client.redeem(challenge, proof.nonce64_hex, proof.digest_hex);

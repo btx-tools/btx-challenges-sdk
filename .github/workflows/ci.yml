@@ -39,7 +39,11 @@ jobs:
 
       - name: Format check (prettier)
         # Audit finding G-4. Catches style drift before it lands on main.
-        run: pnpm -r exec prettier --check "src/**/*.ts" "tests/**/*.ts"
+        # Single root invocation scoped to packages/* — `pnpm -r exec` also ran
+        # inside examples/* (workspace members with no tests/ dir), which made
+        # prettier exit 2 ("no files matching tests/**/*.ts"). Root glob over
+        # packages/* matches at least one file per arg, so no false "no files".
+        run: pnpm exec prettier --check "packages/*/src/**/*.ts" "packages/*/tests/**/*.ts"
 
       - name: Pack dry-run
         # Audit finding G-3. Surfaces publish-time tarball issues (oversized

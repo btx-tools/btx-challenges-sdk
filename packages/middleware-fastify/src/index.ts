@@ -55,11 +55,7 @@
  * ```
  */
 
-import type {
-  FastifyReply,
-  FastifyRequest,
-  preHandlerAsyncHookHandler,
-} from 'fastify';
+import type { FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
 
 import type {
   BtxChallengeClient,
@@ -192,10 +188,13 @@ async function redeemAndAdmit(
   const digest = headerValue(req, HEADER_PROOF_DIGEST);
 
   if (!challengeRaw) {
-    await reply.code(400).header('content-type', 'application/json').send({
-      error: 'missing_challenge_header',
-      message: `Retry must include the original challenge in the ${HEADER_CHALLENGE} header (echo-back).`,
-    });
+    await reply
+      .code(400)
+      .header('content-type', 'application/json')
+      .send({
+        error: 'missing_challenge_header',
+        message: `Retry must include the original challenge in the ${HEADER_CHALLENGE} header (echo-back).`,
+      });
     return;
   }
 
@@ -203,10 +202,13 @@ async function redeemAndAdmit(
   try {
     challenge = JSON.parse(challengeRaw) as Challenge;
   } catch {
-    await reply.code(400).header('content-type', 'application/json').send({
-      error: 'malformed_challenge_header',
-      message: `${HEADER_CHALLENGE} must be a JSON-encoded Challenge envelope.`,
-    });
+    await reply
+      .code(400)
+      .header('content-type', 'application/json')
+      .send({
+        error: 'malformed_challenge_header',
+        message: `${HEADER_CHALLENGE} must be a JSON-encoded Challenge envelope.`,
+      });
     return;
   }
 
@@ -214,10 +216,13 @@ async function redeemAndAdmit(
   // make sure it matches the embedded id.
   const idHeader = headerValue(req, HEADER_CHALLENGE_ID);
   if (idHeader && idHeader !== challenge.challenge_id) {
-    await reply.code(400).header('content-type', 'application/json').send({
-      error: 'challenge_id_mismatch',
-      message: `${HEADER_CHALLENGE_ID} does not match challenge_id in ${HEADER_CHALLENGE}.`,
-    });
+    await reply
+      .code(400)
+      .header('content-type', 'application/json')
+      .send({
+        error: 'challenge_id_mismatch',
+        message: `${HEADER_CHALLENGE_ID} does not match challenge_id in ${HEADER_CHALLENGE}.`,
+      });
     return;
   }
 

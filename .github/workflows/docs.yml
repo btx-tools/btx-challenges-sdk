@@ -48,7 +48,9 @@ jobs:
         run: pnpm -r build
 
       - name: Generate API docs
-        run: pnpm docs
+        # `pnpm run docs` (not bare `pnpm docs`) — bare `docs` resolves to a
+        # built-in that opens the package homepage instead of the script.
+        run: pnpm run docs
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

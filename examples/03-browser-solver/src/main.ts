@@ -68,7 +68,10 @@ function appendRow(
   els.resultsBody.appendChild(tr);
 }
 
-async function postWithoutProof(url: string, body: string): Promise<{ challenge: Challenge; raw: string }> {
+async function postWithoutProof(
+  url: string,
+  body: string,
+): Promise<{ challenge: Challenge; raw: string }> {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

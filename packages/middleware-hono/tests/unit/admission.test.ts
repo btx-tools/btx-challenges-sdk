@@ -98,17 +98,21 @@ const STUB_INVALID: VerifyResult = {
   expired: false,
 };
 
-function mockClient(overrides: Partial<{
-  issue: () => Promise<Challenge>;
-  redeem: () => Promise<VerifyResult>;
-}> = {}): BtxChallengeClient {
+function mockClient(
+  overrides: Partial<{
+    issue: () => Promise<Challenge>;
+    redeem: () => Promise<VerifyResult>;
+  }> = {},
+): BtxChallengeClient {
   return {
     issue: overrides.issue ?? vi.fn(async () => STUB_CHALLENGE),
     redeem: overrides.redeem ?? vi.fn(async () => STUB_VALID),
   } as unknown as BtxChallengeClient;
 }
 
-function buildApp(opts: Partial<BtxAdmissionOpts> = {}): Hono<{ Variables: BtxAdmissionVariables }> {
+function buildApp(
+  opts: Partial<BtxAdmissionOpts> = {},
+): Hono<{ Variables: BtxAdmissionVariables }> {
   const o: BtxAdmissionOpts = {
     client: opts.client ?? mockClient(),
     purpose: opts.purpose ?? 'rate_limit',
@@ -195,7 +199,7 @@ describe('btxAdmission (Hono) — redeem path (proof headers present)', () => {
       body: '{}',
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { ok: boolean; admitted_via: string };
+    const body = (await res.json()) as { ok: boolean; admitted_via: string };
     expect(body).toEqual({ ok: true, admitted_via: 'ok' });
     expect(redeem).toHaveBeenCalledTimes(1);
     expect(onAdmit).toHaveBeenCalledTimes(1);
@@ -213,7 +217,7 @@ describe('btxAdmission (Hono) — redeem path (proof headers present)', () => {
       body: '{}',
     });
     expect(res.status).toBe(403);
-    const body = await res.json() as { valid: boolean; reason: string };
+    const body = (await res.json()) as { valid: boolean; reason: string };
     expect(body.valid).toBe(false);
     expect(body.reason).toBe('digest_mismatch');
   });
@@ -255,7 +259,11 @@ describe('btxAdmission (Hono) — D-1 onError hook', () => {
     const onError = vi.fn();
     const boom = new Error('btxd down');
     const app = buildApp({
-      client: mockClient({ issue: vi.fn(async () => { throw boom; }) }),
+      client: mockClient({
+        issue: vi.fn(async () => {
+          throw boom;
+        }),
+      }),
       onError,
     });
     const res = await app.request('/v1/gate', { method: 'POST', body: '{}' });
@@ -268,7 +276,11 @@ describe('btxAdmission (Hono) — D-1 onError hook', () => {
     const onError = vi.fn();
     const boom = new Error('rpc timeout');
     const app = buildApp({
-      client: mockClient({ redeem: vi.fn(async () => { throw boom; }) }),
+      client: mockClient({
+        redeem: vi.fn(async () => {
+          throw boom;
+        }),
+      }),
       onError,
     });
     const res = await app.request('/v1/gate', {

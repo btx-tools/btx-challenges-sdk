@@ -27,10 +27,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { fromSeedRect } from '../../src/matmul/matrix.js';
-import {
-  canonicalMatMul,
-  deriveCompressionVector,
-} from '../../src/matmul/transcript.js';
+import { canonicalMatMul, deriveCompressionVector } from '../../src/matmul/transcript.js';
 
 const seed32 = (fill: number): Uint8Array => {
   const s = new Uint8Array(32);
