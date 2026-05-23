@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BTX WASM solver — benchmark</title>
+    <style>
+      body {
+        max-width: 820px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        font-family: -apple-system, system-ui, sans-serif;
+      }
+      pre {
+        background: #111;
+        color: #b9f;
+        padding: 1rem;
+        border-radius: 6px;
+        white-space: pre-wrap;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 0.85rem;
+        min-height: 12rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>BTX WASM solver — Phase 2 benchmark</h1>
+    <p>
+      In-browser byte-exact check (n=8) + per-attempt cost &amp; pooled solve at production n=512.
+      <strong>Not a production captcha</strong> — floor difficulty, hashcash-grade.
+    </p>
+    <pre id="out"></pre>
+    <script type="module" src="/src/bench.ts"></script>
+  </body>
+</html>
