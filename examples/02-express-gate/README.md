@@ -10,7 +10,7 @@ Together they show the stateless echo-the-challenge pattern: the server never pe
 ## Prereqs
 
 - Node ≥ 18.17
-- A reachable btxd with the service-challenge RPCs (v0.30.1+) — see `.env.example`
+- A reachable **btxd** node with the service-challenge RPCs (v0.30.1+) — **non-mining** if you want fast (~1–4 s) `rpc`-mode solves. There is no hosted endpoint; you point at a node you run. See `.env.example` and [core → Prerequisites: you need a BTX node](../../packages/core#prerequisites-you-need-a-btx-node).
 - Two terminals (one for the server, one for the client)
 
 ## Install + run

@@ -279,7 +279,10 @@ export interface RpcCallOpts {
 /** RPC client configuration. */
 export interface BtxClientOpts {
   /**
-   * Full JSON-RPC endpoint, e.g. `http://127.0.0.1:19332`.
+   * Full JSON-RPC endpoint of a **BTX node (`btxd`)**, e.g. `http://127.0.0.1:19332`.
+   * This is a node you (or a shared operator) run — there is no default/hosted
+   * endpoint. For `rpc`-mode solving it must be a **non-mining** node. See
+   * {@link BtxChallengeClient} for who needs a node.
    *
    * **Security**: use HTTPS (or a localhost-only deployment) when the RPC
    * endpoint is not on `127.0.0.1`. Basic auth over plaintext exposes credentials.

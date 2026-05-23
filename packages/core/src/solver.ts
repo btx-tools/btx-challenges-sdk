@@ -5,14 +5,19 @@ import type { Challenge, SolverOutput } from './types.js';
 /**
  * How a challenge should be solved.
  *
+ * Solving is the costly half of the protocol — it needs either a reachable
+ * **btxd** node (`'rpc'`) or a lot of local CPU time (`'pure-js'`). See
+ * {@link Solver.solve} for the node prerequisite and who runs what.
+ *
  * - `'rpc'` — delegate to btxd's `solvematmulservicechallenge`. Requires
- *   `opts.rpcClient`. Server-side / Node-only.
+ *   `opts.rpcClient` pointed at a **non-mining** btxd. Server-side / Node-only.
+ *   Fast (~1–4 s) — the production path.
  *
  * - `'pure-js'` — solve locally with a pure-TypeScript MatMul implementation.
- *   Browser-compatible. Ports the canonical CPU path of btxd's matmul solver.
- *   At default difficulty + n=512, pure-JS solving is slow (perf is currently
- *   bounded by `BigInt`-based M31 multiplication; WASM/SIMD acceleration is
- *   planned for a future iteration).
+ *   No node required, browser-compatible. **Slow**: bounded by `BigInt`-based
+ *   M31 multiplication — ~minutes-to-hours at production difficulty. A 2026-05
+ *   WASM spike measured ~24.5× over pure-JS but still ~1000× over a 1–4 s
+ *   budget, so browser solving is reference-only; solve server-side via `'rpc'`.
  *
  * - `'auto'` — pick automatically: `'rpc'` if `opts.rpcClient` is provided,
  *   else `'pure-js'`.

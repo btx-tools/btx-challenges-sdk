@@ -4,6 +4,14 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-05-23 — `@btx-tools/challenges-sdk` (code docs)
+
+Source-doc clarity; no behavior change. Republished so the `.d.ts` (IDE hover) carries it.
+
+- **`BtxChallengeClient` JSDoc** now states the **node prerequisite** + who needs one: the service provider always (for `issue`/`verify`/`redeem`); callers only for fast `rpc` solving (else slow pure-JS). `rpcUrl` doc notes it's a `btxd` you run (no hosted endpoint), non-mining for `rpc` solves.
+- **`SolverMode` JSDoc** de-stale'd: dropped "WASM/SIMD acceleration planned" (the 2026-05 spike concluded browser solving isn't viable) → now points to `rpc` server-side solving as the production path.
+- Example `02-express-gate` prereqs note the non-mining requirement + link to core Prerequisites.
+
 ## 2026-05-23 — docs clarity pass (core → `1.0.2`, middleware-\* → `1.0.1`)
 
 Docs-only across the family; no code or API change. Republished so the npm package pages carry the clarity.

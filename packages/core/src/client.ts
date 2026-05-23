@@ -140,6 +140,19 @@ function nextRequestId(): string {
 /**
  * JSON-RPC client for BTX service-challenges.
  *
+ * **Prerequisite — this points at a reachable BTX node (`btxd`).** There is no
+ * default or hosted endpoint; `rpcUrl` is a `btxd` you (or a shared operator)
+ * run. Who needs a node:
+ *   - **The service provider** (the gate) — for `issue` / `verify` / `redeem`.
+ *     These are lightweight; any synced btxd serves them fast.
+ *   - **Whoever solves** the challenge — for `solve` via `'rpc'` mode, that node
+ *     must be **non-mining** (a mining node queues the solver behind block work,
+ *     10+ min). The caller can instead solve in-process with the pure-JS
+ *     {@link Solver} (no node, but minutes-to-hours at production difficulty).
+ * In short: the *server* always needs node access; *callers* need it too only
+ * for fast solving — which is why the strongest fit is server-to-server / agent
+ * gating, where both ends are infrastructure. See {@link Solver}.
+ *
  * Wraps the 5 core RPCs:
  *   - getmatmulservicechallenge   (issue)
  *   - verifymatmulserviceproof    (verify, stateless)
