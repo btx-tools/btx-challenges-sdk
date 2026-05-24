@@ -4,7 +4,14 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
-## [1.1.0] - `@btx-tools/challenges-sdk` (WASM solver mode) — pending publish
+## [1.1.1] - 2026-05-24 — `@btx-tools/challenges-sdk` (docs only)
+
+README/USE-CASES refresh so the npm page matches the shipped `mode: 'wasm'` — **no code, no API change.** Republished so the corrected README reaches the npm package page (1.1.0's page still framed WASM as "won't rescue / reference-only", which predated shipping the mode).
+
+- Core README documents 4 Solver modes (`+'wasm'`) + the `auto` cascade; the perf note reframed (kernel shipped, ~24×, still not a casual captcha).
+- Monorepo README: `@btx-tools/matmul-wasm` sibling row + optional install; USE-CASES decision tree/summary add `wasm` rows; `examples/03` README documents the WASM bench; `BROWSER-PERF-FINDINGS` top update note. Honest framing throughout: WASM = fastest no-node solver + high-friction gates, **not** a casual 1–4 s browser captcha at the live `n=512`.
+
+## [1.1.0] - 2026-05-24 — `@btx-tools/challenges-sdk` (WASM solver mode)
 
 Adds an optional **WASM solver mode** backed by
 [`@btx-tools/matmul-wasm`](https://github.com/btx-tools/btx-challenges-wasm) — a

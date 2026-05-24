@@ -1,6 +1,6 @@
 {
   "name": "@btx-tools/challenges-sdk",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "TypeScript SDK for BTX service challenges — chain-anchored proof-of-work admission control for APIs, agent gateways, and form submissions",
   "author": "visitor-code <visitor@friction.market>",
   "license": "MIT",
