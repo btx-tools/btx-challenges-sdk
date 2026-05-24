@@ -31,9 +31,12 @@ const STUB_CHALLENGE: Challenge = {
   expires_in_s: 300,
   binding: {
     chain: 'main',
-    purpose: 'rate_limit',
-    resource: 'test:/v1/gate',
-    subject: 'tenant:test',
+    // Matches the redeem-path tests' opts ({purpose:'r',resource:'r',subject:'s'})
+    // so the default-on H-1 binding check passes; a dedicated describe block
+    // below exercises the mismatch → 403 path.
+    purpose: 'r',
+    resource: 'r',
+    subject: 's',
     resource_hash: 'aa',
     subject_hash: 'bb',
     salt: 'cc',
@@ -227,7 +230,7 @@ describe('btxAdmission — 200 admit path (valid proof)', () => {
     const client = makeClient();
     const app = makeApp({
       client,
-      purpose: 'rate_limit',
+      purpose: 'r',
       resource: 'r',
       subject: 's',
     });
@@ -334,6 +337,49 @@ describe('btxAdmission — 403 reject path', () => {
 
     expect(res.status).toBe(403);
     expect(res.body.reason).toBe('already_redeemed');
+  });
+});
+
+describe('btxAdmission — challenge binding enforcement (audit H-1)', () => {
+  it('denies 403 challenge_binding_mismatch when binding ≠ request (default-on)', async () => {
+    const redeem = vi.fn().mockResolvedValue(STUB_VERIFY_OK);
+    const client = makeClient({ redeem });
+    // opts resolve to a DIFFERENT binding than the echoed STUB_CHALLENGE
+    // (resource 'other' ≠ stub 'r'). enforceBinding omitted → defaults true.
+    const app = makeApp({ client, purpose: 'r', resource: 'other', subject: 's' });
+
+    const res = await request(app)
+      .post('/gated')
+      .set(HEADER_CHALLENGE, JSON.stringify(STUB_CHALLENGE))
+      .set(HEADER_PROOF_NONCE, '01')
+      .set(HEADER_PROOF_DIGEST, '02')
+      .send({});
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('challenge_binding_mismatch');
+    // Critically: it never reached redeem (denied before the RPC).
+    expect(redeem).not.toHaveBeenCalled();
+  });
+
+  it('admits a mismatched binding when enforceBinding:false (opt-out)', async () => {
+    const client = makeClient();
+    const app = makeApp({
+      client,
+      purpose: 'r',
+      resource: 'other',
+      subject: 's',
+      enforceBinding: false,
+    });
+
+    const res = await request(app)
+      .post('/gated')
+      .set(HEADER_CHALLENGE, JSON.stringify(STUB_CHALLENGE))
+      .set(HEADER_PROOF_NONCE, '01')
+      .set(HEADER_PROOF_DIGEST, '02')
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(client.redeem).toHaveBeenCalledOnce();
   });
 });
 

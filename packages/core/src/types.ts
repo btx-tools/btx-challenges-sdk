@@ -104,7 +104,12 @@ export interface ChallengeHeaderContext {
   merkleroot: string;
   time: number;
   bits: string;
-  nonce64_start: number;
+  /**
+   * Starting nonce offset. `number | string` (audit L-4): btxd's `nonce64` is a
+   * full u64; values > 2^53 lose precision as a JS `number`, so btxd may emit it
+   * as a decimal string. `BigInt()` (in the solvers) accepts either form.
+   */
+  nonce64_start: number | string;
   matmul_dim: number;
   seed_a: string;
   seed_b: string;

@@ -1,5 +1,5 @@
 import type { BtxChallengeClient } from './client.js';
-import { solveJs, type SolveJsOptions } from './matmul/pow.js';
+import { solveJs, validateMatmulParams, type SolveJsOptions } from './matmul/pow.js';
 import type { Challenge, SolverOutput } from './types.js';
 
 /**
@@ -219,6 +219,10 @@ export function challengeToWasmArgs(challenge: Challenge): WasmSolverArgs {
   const payload = challenge.challenge;
   const ctx = payload.header_context;
   const { n, b, r, seed_a, seed_b } = payload.matmul;
+  // Audit M-1: bound-check before handing n/b/r to the kernel (the WASM kernel
+  // also guards internally, but this gives a clear error at the SDK boundary and
+  // keeps pure-JS / WASM rejecting the same inputs).
+  validateMatmulParams(n, b, r);
   if (ctx.seed_a !== seed_a || ctx.seed_b !== seed_b || ctx.matmul_dim !== n) {
     throw new Error(
       'Solver.solve: mode="wasm" requires header_context.{seed_a,seed_b,matmul_dim} to equal ' +
@@ -317,16 +321,27 @@ async function loadWasm(): Promise<WasmLoad> {
   let mod: unknown;
   try {
     mod = await import(spec);
-  } catch {
-    cachedLoad = { kind: 'absent' };
-    return cachedLoad;
+  } catch (err) {
+    // L-5 (audit 2026-05-24): only a genuine "not installed" is permanent (cache
+    // it). Any other import error (transient loader/FS hiccup) is left UNcached
+    // so a later call retries instead of being stuck on pure-js forever.
+    const code = (err as { code?: unknown })?.code;
+    if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
+      cachedLoad = { kind: 'absent' };
+      return cachedLoad;
+    }
+    return { kind: 'absent' };
   }
   try {
-    cachedLoad = { kind: 'ok', Ctor: await resolveWasmCtor(mod) };
+    const ok: WasmLoad = { kind: 'ok', Ctor: await resolveWasmCtor(mod) };
+    cachedLoad = ok; // success is permanent
+    return ok;
   } catch (cause) {
-    cachedLoad = { kind: 'init-failed', cause };
+    // init-failed left UNcached (retryable) — the import succeeded, so this is
+    // either a transient init issue or web-target-in-Node (re-probed each call,
+    // cheap: the module is runtime-cached, only init() re-runs).
+    return { kind: 'init-failed', cause };
   }
-  return cachedLoad;
 }
 
 async function solveViaWasm(challenge: Challenge, opts: SolverOptions): Promise<SolverOutput> {

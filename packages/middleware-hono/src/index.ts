@@ -106,6 +106,14 @@ export interface BtxAdmissionOpts {
   subject: StringOrFn;
   /** Extra issue params forwarded to `client.issue()` (target_solve_time_s, expires_in_s, etc.). */
   issueParams?: Partial<Omit<IssueParams, 'purpose' | 'resource' | 'subject'>>;
+  /**
+   * Enforce that the redeemed challenge's `binding.{resource,subject,purpose}`
+   * matches what *this* request resolves to (audit H-1). Default **`true`**.
+   * Without it, a valid proof issued for one binding can be replayed to admit a
+   * different route/tenant (btxd's redeem can't see the request). Resolvers must
+   * be deterministic per request. Set `false` only for intentional cross-binding reuse.
+   */
+  enforceBinding?: boolean;
   /** Optional hook fired on successful admission. Receives `c` + the redeem result. */
   onAdmit?: (c: Context, result: VerifyResult) => void;
   /**
@@ -155,11 +163,13 @@ async function issueAndRespond(c: Context, opts: BtxAdmissionOpts): Promise<Resp
     const purpose = await resolve(opts.purpose, c);
     const resource = await resolve(opts.resource, c);
     const subject = await resolve(opts.subject, c);
+    // binding fields LAST so issueParams can't override them at runtime
+    // (defense-in-depth) + keeps the issued binding == the H-1 redeem check.
     const challenge = await opts.client.issue({
+      ...opts.issueParams,
       purpose,
       resource,
       subject,
-      ...opts.issueParams,
     });
     c.header(HEADER_CHALLENGE, JSON.stringify(challenge));
     return c.json(
@@ -194,6 +204,17 @@ async function redeemAndAdmit(
     );
   }
 
+  // L-7 (audit 2026-05-24): bound the header before JSON.parse (edge CPU budgets).
+  if (challengeRaw.length > MAX_CHALLENGE_HEADER_BYTES) {
+    return c.json(
+      {
+        error: 'challenge_header_too_large',
+        message: `${HEADER_CHALLENGE} exceeds ${MAX_CHALLENGE_HEADER_BYTES} bytes.`,
+      },
+      400,
+    );
+  }
+
   let challenge: Challenge;
   try {
     challenge = JSON.parse(challengeRaw) as Challenge;
@@ -220,27 +241,57 @@ async function redeemAndAdmit(
     );
   }
 
-  try {
-    const result = await opts.client.redeem(challenge, nonce!, digest!);
-    if (!result.valid) {
+  // H-1 (audit 2026-05-24): enforce challenge binding matches THIS request
+  // (btxd's redeem can't see the request). Default-on; opt out via enforceBinding:false.
+  if (opts.enforceBinding !== false) {
+    const b = challenge.binding;
+    if (
+      b?.resource !== (await resolve(opts.resource, c)) ||
+      b?.subject !== (await resolve(opts.subject, c)) ||
+      b?.purpose !== (await resolve(opts.purpose, c))
+    ) {
       return c.json(
         {
-          valid: false,
-          reason: result.reason,
-          expired: result.expired,
+          error: 'challenge_binding_mismatch',
+          message:
+            'Challenge binding does not match this request (resource/subject/purpose). ' +
+            'The proof was issued for a different binding.',
         },
         403,
       );
     }
-    c.set('btx', { result });
-    opts.onAdmit?.(c, result);
-    await next();
-    return;
+  }
+
+  let result;
+  try {
+    result = await opts.client.redeem(challenge, nonce!, digest!);
   } catch (err) {
+    // Only the redeem RPC is wrapped (audit M-2): a downstream handler throw in
+    // `next()` must NOT be routed through onError as if it were an RPC failure.
     opts.onError?.(err, c);
     throw err;
   }
+
+  // M-3 (audit 2026-05-24): strict success whitelist.
+  if (result.valid !== true || result.redeemed === false) {
+    return c.json(
+      {
+        valid: false,
+        reason: result.reason,
+        expired: result.expired,
+      },
+      403,
+    );
+  }
+  c.set('btx', { result });
+  opts.onAdmit?.(c, result);
+  // next() is OUTSIDE the try (M-2) — post-admission handler errors propagate
+  // to Hono's own error handling, not this middleware's onError.
+  await next();
+  return;
 }
+
+const MAX_CHALLENGE_HEADER_BYTES = 64 * 1024;
 
 async function resolve(value: StringOrFn, c: Context): Promise<string> {
   if (typeof value === 'function') {

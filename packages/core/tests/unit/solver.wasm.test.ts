@@ -124,6 +124,19 @@ describe('challengeToWasmArgs', () => {
   // Audit C-1: the WASM kernel uses one seed/dim for both the seed matrices and
   // the header; the pure-JS path reads them from two sources. Guard that they
   // agree, so mode:'wasm' fails loud rather than emitting a divergent proof.
+  // Audit M-1: reject an out-of-range n before the kernel allocates n×n.
+  it('throws when matmul n exceeds the bound', () => {
+    const huge: Challenge = {
+      ...challenge,
+      challenge: {
+        ...challenge.challenge,
+        header_context: { ...challenge.challenge.header_context, matmul_dim: 8192 },
+        matmul: { ...challenge.challenge.matmul, n: 8192, b: 16 },
+      },
+    };
+    expect(() => challengeToWasmArgs(huge)).toThrow(/exceeds max/);
+  });
+
   it('throws when header_context seeds/dim differ from matmul seeds/n', () => {
     const divergent: Challenge = {
       ...challenge,

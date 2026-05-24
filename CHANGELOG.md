@@ -4,6 +4,52 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-24 — `challenges-sdk` 1.2.0 + middleware-\* 1.1.0 (audit remediation) — pending publish
+
+Security + correctness fixes from the 2026-05-24 org-wide deep audit (no Critical;
+this hardens the admission boundary + input validation). Coordinated minor across
+core (`1.1.1 → 1.2.0`) and all three middleware adapters (`1.0.1 → 1.1.0`, peer
+`^1.2.0`).
+
+### Security / behavior (read before upgrading)
+
+- **H-1 — middleware now enforces challenge binding (default-on).** The adapters
+  re-derive `resource`/`subject`/`purpose` for the redeeming request and **deny
+  `403 challenge_binding_mismatch`** if the echoed challenge's `binding` doesn't
+  match. Closes a proof-reuse bypass: a valid proof issued for one binding could
+  previously admit a *different* route/tenant on the same btxd (btxd's redeem
+  can't see the HTTP request). **Behavior change:** binding resolvers must be
+  **deterministic per request**; opt out with `enforceBinding: false`. (The
+  README's prior "btxd enforces the binding" note was wrong.)
+- **M-3 — strict admit:** adapters admit only on `result.valid === true` (and not
+  `redeemed === false`) — a truthy-non-`true` `valid` or a verify-only result no
+  longer admits.
+- **issueParams can no longer override the binding** at runtime (binding fields
+  are applied last) — defense-in-depth, and keeps the issued binding equal to
+  what the H-1 check re-derives.
+- **`engines.node` → `>=20.19.0`** (was `>=18.17`). Matches the `@noble/hashes`
+  floor; Node 18 is EOL. CI matrix drops 18.
+
+### Fixed (core)
+
+- **H-3 — `issue()` uses named (object) JSON-RPC params** so omitted optionals are
+  truly absent (the positional form serialized skipped middle params as explicit
+  `null`, which btxd mis-handles). Verified btxd 0.30.1 accepts named params.
+- **M-2 — `redeem`/`redeemBatch` are no longer auto-retried** (non-idempotent: a
+  retry after a lost response gets `already_redeemed` and would falsely deny a payer).
+- **M-1 / M-5 — matmul params are bounds-checked** (`validateMatmulParams`: n≤4096,
+  r≤256) before any `n×n` allocation, in both `solveJs` and the WASM-arg mapping;
+  `serializeMatMulHeader` **throws** on `matmul_dim > 0xffff` instead of masking
+  (which had produced silently-wrong proofs).
+- **M-6 — malformed JSON-RPC error envelopes** yield `BtxParseError`, not
+  `BtxRpcError(undefined)`.
+- **L-1** wider credential redaction (Bearer, quoted/space values, passphrase/authkey);
+  **L-2** response-body size cap; **L-4** `nonce64_start` accepts `string` (u64 > 2^53);
+  **L-5** the optional-kernel probe no longer caches transient import failures;
+  **L-7** challenge header size-capped before `JSON.parse`. **M-2(hono)** `next()` moved
+  out of the redeem try/catch so post-admission handler errors don't misfire `onError`.
+  **V-2** `fetch` uses `redirect: 'error'`.
+
 ## [1.1.1] - 2026-05-24 — `@btx-tools/challenges-sdk` (docs only)
 
 README/USE-CASES refresh so the npm page matches the shipped `mode: 'wasm'` — **no code, no API change.** Republished so the corrected README reaches the npm package page (1.1.0's page still framed WASM as "won't rescue / reference-only", which predated shipping the mode).

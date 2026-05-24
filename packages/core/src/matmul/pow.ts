@@ -29,6 +29,33 @@ import { canonicalMatMul } from './transcript.js';
 
 const MAX_U64 = (1n << 64n) - 1n;
 
+/** Max accepted matrix dimension `n` (audit M-1). Mirrors the Rust kernel's
+ * MAX_N. Production is 512; protocol max_dimension is 2048; 4096 leaves headroom
+ * while keeping `n×n` allocations sane and < the `Uint32Array` index limit. */
+export const MAX_MATMUL_N = 4096;
+/** Max accepted noise rank `r` (audit M-1). Mirrors the Rust kernel's MAX_R. */
+export const MAX_MATMUL_R = 256;
+
+/**
+ * Validate the challenge's matmul params before any `n×n` allocation (audit
+ * M-1). Bounds `n`/`r` so a pathological/forged envelope can't trigger a
+ * multi-GB allocation or a `RangeError` (`n≥65536` overflows the Uint32Array
+ * index); mirrors the Rust kernel's `from_hex` checks so pure-JS and WASM reject
+ * the same inputs. Throws a clear `Error` on violation.
+ */
+export function validateMatmulParams(n: number, b: number, r: number): void {
+  if (!Number.isInteger(n) || !Number.isInteger(b) || !Number.isInteger(r)) {
+    throw new Error(`matmul params must be integers (n=${n}, b=${b}, r=${r})`);
+  }
+  if (n <= 0 || b <= 0 || r <= 0) {
+    throw new Error(`invalid matmul params (n=${n}, b=${b}, r=${r})`);
+  }
+  if (n > MAX_MATMUL_N) throw new Error(`n=${n} exceeds max ${MAX_MATMUL_N}`);
+  if (r > MAX_MATMUL_R) throw new Error(`r=${r} exceeds max ${MAX_MATMUL_R}`);
+  if (b > n) throw new Error(`b=${b} exceeds n=${n}`);
+  if (n % b !== 0) throw new Error(`n=${n} not divisible by b=${b}`);
+}
+
 /** Options for the pure-JS solver (`Solver.solve` with `mode: 'pure-js'`). */
 export interface SolveJsOptions {
   /** Max nonces to try before giving up. Default 1_000_000. */
@@ -61,12 +88,9 @@ export function solveJs(challenge: Challenge, options: SolveJsOptions = {}): Sol
   const nonceStart = options.nonceStart ?? BigInt(ctx.nonce64_start ?? 0);
   const attemptInterval = options.attemptInterval ?? 1;
 
-  if (n <= 0 || b <= 0 || r <= 0) {
-    throw new Error(`solveJs: invalid matmul params (n=${n}, b=${b}, r=${r})`);
-  }
-  if (n % b !== 0) {
-    throw new Error(`solveJs: n=${n} not divisible by b=${b}`);
-  }
+  // Audit M-1: bounds-check (incl. an upper bound on n) BEFORE the n×n
+  // allocation below, so a pathological envelope can't OOM / RangeError.
+  validateMatmulParams(n, b, r);
 
   // Parse fixed inputs.
   const seedA = parseHex32(payload.matmul.seed_a, 'seed_a');

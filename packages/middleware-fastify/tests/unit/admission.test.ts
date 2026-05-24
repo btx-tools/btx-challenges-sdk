@@ -120,6 +120,7 @@ function buildApp(opts: Partial<BtxAdmissionOpts> = {}): FastifyInstance {
     onAdmit: opts.onAdmit,
     onError: opts.onError,
     isProofPresent: opts.isProofPresent,
+    enforceBinding: opts.enforceBinding,
   };
   app.post('/v1/gate', { preHandler: btxAdmission(o) }, async (req) => {
     return { ok: true, admitted_via: req.btx?.result?.reason };
@@ -259,6 +260,42 @@ describe('btxAdmission (Fastify) — redeem path (proof headers present)', () =>
     });
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.payload).error).toBe('malformed_challenge_header');
+  });
+});
+
+describe('btxAdmission (Fastify) — challenge binding enforcement (audit H-1)', () => {
+  it('denies 403 challenge_binding_mismatch when binding ≠ request (default-on)', async () => {
+    const redeem = vi.fn(async () => STUB_VALID);
+    // resource 'other' ≠ stub binding 'test:/v1/gate'; enforceBinding defaults true.
+    app = buildApp({ client: mockClient({ redeem }), resource: 'other' });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/gate',
+      headers: {
+        [HEADER_CHALLENGE]: JSON.stringify(STUB_CHALLENGE),
+        [HEADER_PROOF_NONCE]: '00'.repeat(8),
+        [HEADER_PROOF_DIGEST]: '00'.repeat(32),
+      },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.payload).error).toBe('challenge_binding_mismatch');
+    expect(redeem).not.toHaveBeenCalled();
+  });
+
+  it('admits a mismatched binding when enforceBinding:false (opt-out)', async () => {
+    app = buildApp({ resource: 'other', enforceBinding: false });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/gate',
+      headers: {
+        [HEADER_CHALLENGE]: JSON.stringify(STUB_CHALLENGE),
+        [HEADER_PROOF_NONCE]: '00'.repeat(8),
+        [HEADER_PROOF_DIGEST]: '00'.repeat(32),
+      },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(200);
   });
 });
 

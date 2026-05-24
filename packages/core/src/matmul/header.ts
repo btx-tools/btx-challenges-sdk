@@ -88,7 +88,14 @@ export function serializeMatMulHeader(input: MatMulHeaderInput): Uint8Array {
   writeUint64LE(buf, off, input.nonce64);
   off += 8;
 
-  writeUint16LE(buf, off, input.matmul_dim & 0xffff);
+  // Audit M-5: throw rather than silently mask. Masking `& 0xffff` would let an
+  // n>65535 serialize a truncated dim while the matrices use full n → a silently
+  // wrong (un-redeemable) proof. (validateMatmulParams caps n at 4096 upstream;
+  // this is the last-line guard at the serialization boundary.)
+  if (input.matmul_dim < 0 || input.matmul_dim > 0xffff) {
+    throw new Error(`header: matmul_dim=${input.matmul_dim} out of uint16 range`);
+  }
+  writeUint16LE(buf, off, input.matmul_dim);
   off += 2;
 
   buf.set(parseUint256HexToLE(input.seed_a, 'seed_a'), off);

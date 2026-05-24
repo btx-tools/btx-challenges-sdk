@@ -122,6 +122,7 @@ function buildApp(
     onAdmit: opts.onAdmit,
     onError: opts.onError,
     isProofPresent: opts.isProofPresent,
+    enforceBinding: opts.enforceBinding,
   };
   const app = new Hono<{ Variables: BtxAdmissionVariables }>();
   app.onError((err, c) => c.json({ error: String(err) }, 500));
@@ -203,6 +204,39 @@ describe('btxAdmission (Hono) — redeem path (proof headers present)', () => {
     expect(body).toEqual({ ok: true, admitted_via: 'ok' });
     expect(redeem).toHaveBeenCalledTimes(1);
     expect(onAdmit).toHaveBeenCalledTimes(1);
+  });
+
+  // Audit H-1: challenge binding must match this request (default-on).
+  it('denies 403 challenge_binding_mismatch when binding ≠ request', async () => {
+    const redeem = vi.fn(async () => STUB_VALID);
+    // resource 'other' ≠ stub binding 'test:/v1/gate'; enforceBinding defaults true.
+    const app = buildApp({ client: mockClient({ redeem }), resource: 'other' });
+    const res = await app.request('/v1/gate', {
+      method: 'POST',
+      headers: {
+        [HEADER_CHALLENGE]: JSON.stringify(STUB_CHALLENGE),
+        [HEADER_PROOF_NONCE]: '00'.repeat(8),
+        [HEADER_PROOF_DIGEST]: '00'.repeat(32),
+      },
+      body: '{}',
+    });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: string }).error).toBe('challenge_binding_mismatch');
+    expect(redeem).not.toHaveBeenCalled();
+  });
+
+  it('admits a mismatched binding when enforceBinding:false (opt-out)', async () => {
+    const app = buildApp({ resource: 'other', enforceBinding: false });
+    const res = await app.request('/v1/gate', {
+      method: 'POST',
+      headers: {
+        [HEADER_CHALLENGE]: JSON.stringify(STUB_CHALLENGE),
+        [HEADER_PROOF_NONCE]: '00'.repeat(8),
+        [HEADER_PROOF_DIGEST]: '00'.repeat(32),
+      },
+      body: '{}',
+    });
+    expect(res.status).toBe(200);
   });
 
   it('rejects invalid proof with 403 + reason', async () => {

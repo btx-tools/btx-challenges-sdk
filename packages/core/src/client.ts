@@ -30,6 +30,22 @@ interface JsonRpcResponse<T> {
 const MAX_RETRY_DELAY_MS = 60_000;
 
 /**
+ * Consume-style RPCs that are NOT idempotent — retrying them after a *lost
+ * response* (the proof was already consumed btxd-side) returns
+ * `already_redeemed → valid:false` and would wrongly deny a caller who actually
+ * solved (audit M-2). These methods never auto-retry, regardless of `retry.max`.
+ */
+const NON_IDEMPOTENT_METHODS: ReadonlySet<string> = new Set([
+  'redeemmatmulserviceproof',
+  'redeemmatmulserviceproofs',
+]);
+
+/** Hard cap on an RPC response body (audit L-2). RPC responses are small (KB);
+ * this bounds a hostile/buggy endpoint streaming a huge body. Best-effort via
+ * Content-Length (absent on chunked → wall-clock timeout still bounds it). */
+const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+
+/**
  * Semantic shortcut keys for {@link BtxClientOpts.methodTimeouts} → raw btxd RPC
  * method names (audit L-4, 0.3.0). Lets callers write `{ solve: 1_000_000 }`
  * instead of the verbose `{ solvematmulservicechallenge: 1_000_000 }`. A raw
@@ -118,11 +134,22 @@ function base64Utf8(input: string): string {
  *     error paths (re-audit N2 — added 2026-05-20)
  */
 function redactSensitive(body: string): string {
-  return body
-    .replace(/authorization\s*:\s*basic\s+[A-Za-z0-9+/=]+/gi, 'authorization: basic [REDACTED]')
-    .replace(/"password"\s*:\s*"[^"]*"/gi, '"password":"[REDACTED]"')
-    .replace(/"rpcpassword"\s*:\s*"[^"]*"/gi, '"rpcpassword":"[REDACTED]"')
-    .replace(/\b(rpc(?:user|password|auth))\s*=\s*\S+/gi, '$1=[REDACTED]');
+  return (
+    body
+      .replace(/authorization\s*:\s*basic\s+[A-Za-z0-9+/=]+/gi, 'authorization: basic [REDACTED]')
+      // L-1 (audit 2026-05-24): also redact Bearer tokens (token-auth proxies).
+      .replace(/authorization\s*:\s*bearer\s+[\w.\-+/=]+/gi, 'authorization: bearer [REDACTED]')
+      .replace(/"password"\s*:\s*"[^"]*"/gi, '"password":"[REDACTED]"')
+      .replace(/"rpcpassword"\s*:\s*"[^"]*"/gi, '"rpcpassword":"[REDACTED]"')
+      // L-1: config-line secrets — match a quoted value ("a b") OR a bare token,
+      // so a value with spaces (`rpcpassword="hunter2 with space"`) is fully
+      // redacted (the old `\S+` stopped at the first space). Adds passphrase/authkey
+      // (called out as secret patterns in the global instructions).
+      .replace(
+        /\b(rpc(?:user|password|auth)|passphrase|authkey|wallet_pass)\s*=\s*("[^"]*"|\S+)/gi,
+        '$1=[REDACTED]',
+      )
+  );
 }
 
 /** Generate a stable-uniqueness request id without colliding across instances. */
@@ -184,11 +211,21 @@ export class BtxChallengeClient {
    * audit D-3). Both are opt-in via constructor options; default behavior is
    * unchanged from 0.0.4 (30s single-attempt).
    */
-  async call<T = unknown>(method: string, params: unknown[] = [], opts?: RpcCallOpts): Promise<T> {
+  async call<T = unknown>(
+    method: string,
+    // Array (positional) or object (named) JSON-RPC params. `issue()` uses the
+    // named form (audit H-3) so omitted optional params are truly absent.
+    params: unknown[] | Record<string, unknown> = [],
+    opts?: RpcCallOpts,
+  ): Promise<T> {
     const retry = this.opts.retry ?? { max: 0 };
     // H-1 (audit 2026-05-23): clamp non-integer / negative / NaN to ≥0 so the
     // loop runs at least once and `lastErr` is never thrown undefined.
-    const maxRetries = Math.max(0, Math.floor(Number(retry.max) || 0));
+    // M-2 (audit 2026-05-24): consume-style RPCs never auto-retry — a retry after
+    // a lost response gets `already_redeemed` and would wrongly deny a payer.
+    const maxRetries = NON_IDEMPOTENT_METHODS.has(method)
+      ? 0
+      : Math.max(0, Math.floor(Number(retry.max) || 0));
     const baseDelayMs = retry.baseDelayMs ?? 500;
     let lastErr: unknown;
 
@@ -258,7 +295,7 @@ export class BtxChallengeClient {
   /** Single attempt of the JSON-RPC call (no retry wrapping). */
   private async callOnce<T>(
     method: string,
-    params: unknown[],
+    params: unknown[] | Record<string, unknown>,
     externalSignal?: AbortSignal,
   ): Promise<T> {
     const id = nextRequestId();
@@ -314,6 +351,9 @@ export class BtxChallengeClient {
         },
         body,
         signal: ctrl.signal,
+        // V-2 (audit 2026-05-24): a legitimate btxd JSON-RPC POST never 3xx-
+        // redirects; fail closed rather than chase an attacker-controlled redirect.
+        redirect: 'error',
       });
     } catch (err) {
       clearTimeout(timer);
@@ -338,6 +378,18 @@ export class BtxChallengeClient {
       }
     }
 
+    // L-2 (audit 2026-05-24): reject an oversized body before reading it into
+    // memory (best-effort — Content-Length is absent on chunked, where the
+    // request timeout still bounds wall-clock).
+    const contentLength = Number(res.headers.get('content-length'));
+    if (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_BYTES) {
+      throw new BtxParseError(
+        new Error(`response too large: ${contentLength} bytes > ${MAX_RESPONSE_BYTES}`),
+        '',
+        method,
+      );
+    }
+
     if (!res.ok) {
       const rawBody = await res.text().catch(() => '');
       throw new BtxHttpError(res.status, redactSensitive(rawBody), method);
@@ -351,9 +403,32 @@ export class BtxChallengeClient {
       throw new BtxParseError(err, redactSensitive(rawBody), method);
     }
 
-    if (data.error) {
-      throw new BtxRpcError(data.error.code, data.error.message, method);
+    // M-6 (audit 2026-05-24): validate the JSON-RPC error envelope defensively.
+    // A truthy-but-malformed `error` (`true`, `"boom"`, `42`) would otherwise
+    // throw BtxRpcError(undefined, undefined) and defeat callers branching on
+    // `err.code`. A well-formed object → BtxRpcError; anything else → BtxParseError.
+    if (data.error !== undefined && data.error !== null) {
+      const e = data.error as { code?: unknown; message?: unknown };
+      if (typeof e === 'object' && ('code' in e || 'message' in e)) {
+        throw new BtxRpcError(
+          typeof e.code === 'number' ? e.code : -1,
+          typeof e.message === 'string' ? e.message : 'unknown rpc error',
+          method,
+        );
+      }
+      throw new BtxParseError(
+        new Error('malformed JSON-RPC error envelope'),
+        redactSensitive(rawBody),
+        method,
+      );
     }
+
+    // V-1 (audit 2026-05-24): considered asserting `data.id === id` for
+    // response correlation, but NOT enforced — JSON-RPC over HTTP is strictly
+    // 1:1 (no realistic mismatch path), and btxd/proxies don't uniformly echo
+    // the id verbatim (some normalize string→int or return null), so a hard
+    // check would risk false-positives that break every call. The `id` is still
+    // sent for server-side logging.
     return data.result;
   }
 
@@ -362,32 +437,34 @@ export class BtxChallengeClient {
    * `opts.signal` (added 0.2.0) cancels the request if the caller aborts.
    */
   async issue(params: IssueParams, opts?: RpcCallOpts): Promise<Challenge> {
-    // Per audit M3: do NOT hardcode btxd defaults. Truncate positional args at
-    // the last explicitly-set value so btxd applies its own defaults for omitted ones.
-    const ordered: Array<[string, unknown]> = [
-      ['purpose', params.purpose],
-      ['resource', params.resource],
-      ['subject', params.subject],
-      ['target_solve_time_s', params.target_solve_time_s],
-      ['expires_in_s', params.expires_in_s],
-      ['validation_overhead_s', params.validation_overhead_s],
-      ['propagation_overhead_s', params.propagation_overhead_s],
-      ['difficulty_policy', params.difficulty_policy],
-      ['difficulty_window_blocks', params.difficulty_window_blocks],
-      ['min_solve_time_s', params.min_solve_time_s],
-      ['max_solve_time_s', params.max_solve_time_s],
-      ['solver_parallelism', params.solver_parallelism],
-      ['solver_duty_cycle_pct', params.solver_duty_cycle_pct],
+    // Audit H-3: use NAMED (object) JSON-RPC params. The old positional form
+    // serialized any *skipped middle* param as an explicit `null` (e.g. setting
+    // max_solve_time_s but not target_solve_time_s), which btxd treats very
+    // differently from an absent arg (type error / clobbered default). With
+    // named params, only the keys actually set are sent — omitted ones are truly
+    // absent, so btxd applies its own defaults (the original intent). Bitcoin-
+    // family btxd accepts object params on JSON-RPC 1.0.
+    const named: Record<string, unknown> = {
+      purpose: params.purpose,
+      resource: params.resource,
+      subject: params.subject,
+    };
+    const optional: Array<keyof IssueParams> = [
+      'target_solve_time_s',
+      'expires_in_s',
+      'validation_overhead_s',
+      'propagation_overhead_s',
+      'difficulty_policy',
+      'difficulty_window_blocks',
+      'min_solve_time_s',
+      'max_solve_time_s',
+      'solver_parallelism',
+      'solver_duty_cycle_pct',
     ];
-    let lastSet = 2; // purpose, resource, subject are required
-    for (let i = ordered.length - 1; i > 2; i--) {
-      if (ordered[i]![1] !== undefined) {
-        lastSet = i;
-        break;
-      }
+    for (const key of optional) {
+      if (params[key] !== undefined) named[key] = params[key];
     }
-    const args = ordered.slice(0, lastSet + 1).map(([, v]) => v);
-    return this.call<Challenge>('getmatmulservicechallenge', args, opts);
+    return this.call<Challenge>('getmatmulservicechallenge', named, opts);
   }
 
   /**

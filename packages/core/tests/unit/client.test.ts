@@ -252,28 +252,25 @@ describe('BtxChallengeClient — error normalization', () => {
   });
 });
 
-describe('BtxChallengeClient.issue() — param ordering + truncation', () => {
+describe('BtxChallengeClient.issue() — named params (audit H-3)', () => {
   it('sends only purpose/resource/subject when no optionals set', async () => {
-    let observed: unknown[] | null = null;
+    let observed: unknown = null;
     server.use(
       http.post(RPC_URL, async ({ request }) => {
-        observed = ((await request.json()) as { params: unknown[] }).params;
+        observed = ((await request.json()) as { params: unknown }).params;
         return HttpResponse.json({ result: stubChallenge, error: null, id: 1 });
       }),
     );
-    await makeClient().issue({
-      purpose: 'rate_limit',
-      resource: 'r',
-      subject: 's',
-    });
-    expect(observed).toEqual(['rate_limit', 'r', 's']);
+    await makeClient().issue({ purpose: 'rate_limit', resource: 'r', subject: 's' });
+    // Named (object) params — omitted optionals are absent, so btxd defaults them.
+    expect(observed).toEqual({ purpose: 'rate_limit', resource: 'r', subject: 's' });
   });
 
-  it('truncates positional args at last-set (does not pad with defaults)', async () => {
-    let observed: unknown[] | null = null;
+  it('includes only the optional params that are set', async () => {
+    let observed: unknown = null;
     server.use(
       http.post(RPC_URL, async ({ request }) => {
-        observed = ((await request.json()) as { params: unknown[] }).params;
+        observed = ((await request.json()) as { params: unknown }).params;
         return HttpResponse.json({ result: stubChallenge, error: null, id: 1 });
       }),
     );
@@ -284,28 +281,40 @@ describe('BtxChallengeClient.issue() — param ordering + truncation', () => {
       target_solve_time_s: 2,
       expires_in_s: 60,
     });
-    // Sends 5 args, not all 13 — btxd applies its own defaults for the rest.
-    expect(observed).toEqual(['rate_limit', 'r', 's', 2, 60]);
+    expect(observed).toEqual({
+      purpose: 'rate_limit',
+      resource: 'r',
+      subject: 's',
+      target_solve_time_s: 2,
+      expires_in_s: 60,
+    });
   });
 
-  it('skips undefined slots between set values by including them as undefined-equivalent', async () => {
-    let observed: unknown[] | null = null;
+  it('omits unset middle params entirely — never sends null (H-3 regression)', async () => {
+    let observed: Record<string, unknown> | null = null;
     server.use(
       http.post(RPC_URL, async ({ request }) => {
-        observed = ((await request.json()) as { params: unknown[] }).params;
+        observed = ((await request.json()) as { params: Record<string, unknown> }).params;
         return HttpResponse.json({ result: stubChallenge, error: null, id: 1 });
       }),
     );
+    // Set a LATE optional without the earlier ones — the old positional form
+    // serialized the skipped middle slots as explicit `null`s (the H-3 bug).
     await makeClient().issue({
       purpose: 'rate_limit',
       resource: 'r',
       subject: 's',
-      max_solve_time_s: 10, // index 10
+      max_solve_time_s: 10,
     });
-    // Positions 3-9 are undefined; we still include them up to index 10.
-    expect(Array.isArray(observed)).toBe(true);
-    expect(observed).toHaveLength(11);
-    expect((observed as unknown[])[10]).toBe(10);
+    expect(observed).toEqual({
+      purpose: 'rate_limit',
+      resource: 'r',
+      subject: 's',
+      max_solve_time_s: 10,
+    });
+    // No key carries a null, and target_solve_time_s (a skipped middle param) is absent.
+    expect(Object.values(observed!)).not.toContain(null);
+    expect(observed!).not.toHaveProperty('target_solve_time_s');
   });
 });
 
@@ -957,5 +966,58 @@ describe('BtxChallengeClient — AbortSignal plumbing (0.2.0)', () => {
     await expect(
       client.redeem(stubChallenge, 'a'.repeat(16), 'b'.repeat(64), { signal: ctrl.signal }),
     ).rejects.toBeInstanceOf(BtxNetworkError);
+  });
+});
+
+describe('audit 2026-05-24 hardening (M-2 redeem no-retry, M-6 envelope)', () => {
+  const retryClient = () =>
+    new BtxChallengeClient({
+      rpcUrl: RPC_URL,
+      rpcAuth: { user: 'rpcuser', pass: 'rpcpass' },
+      retry: { max: 3, baseDelayMs: 1, jitter: false },
+    });
+
+  it('M-2: redeem is NOT retried on 5xx (non-idempotent — avoids false-deny)', async () => {
+    let calls = 0;
+    server.use(
+      http.post(RPC_URL, () => {
+        calls++;
+        return new HttpResponse('upstream error', { status: 503 });
+      }),
+    );
+    await expect(
+      retryClient().redeem(stubChallenge, 'a'.repeat(16), 'b'.repeat(64)),
+    ).rejects.toBeInstanceOf(BtxHttpError);
+    expect(calls).toBe(1); // one attempt, no retry
+  });
+
+  it('M-2: an idempotent method (verify) IS still retried on 5xx', async () => {
+    let calls = 0;
+    server.use(
+      http.post(RPC_URL, () => {
+        calls++;
+        if (calls < 2) return new HttpResponse('transient', { status: 503 });
+        return HttpResponse.json({ result: { valid: true, reason: 'ok' }, error: null, id: 1 });
+      }),
+    );
+    await retryClient().verify(stubChallenge, 'a'.repeat(16), 'b'.repeat(64));
+    expect(calls).toBe(2); // retried once
+  });
+
+  it('M-6: a truthy-but-malformed error envelope → BtxParseError (not BtxRpcError(undefined))', async () => {
+    server.use(http.post(RPC_URL, () => HttpResponse.json({ error: 'boom', id: 1 })));
+    await expect(makeClient().call('anything')).rejects.toBeInstanceOf(BtxParseError);
+  });
+
+  it('M-6: a well-formed error envelope → BtxRpcError with the code', async () => {
+    server.use(
+      http.post(RPC_URL, () =>
+        HttpResponse.json({ result: null, error: { code: -8, message: 'paused' }, id: 1 }),
+      ),
+    );
+    await expect(makeClient().call('anything')).rejects.toMatchObject({
+      name: 'BtxRpcError',
+      code: -8,
+    });
   });
 });

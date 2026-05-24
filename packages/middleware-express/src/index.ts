@@ -70,6 +70,16 @@ export interface BtxAdmissionOpts {
   subject: StringOrFn;
   /** Extra issue params forwarded to `client.issue()` (target_solve_time_s, expires_in_s, etc.). */
   issueParams?: Partial<Omit<IssueParams, 'purpose' | 'resource' | 'subject'>>;
+  /**
+   * Enforce that the redeemed challenge's `binding.{resource,subject,purpose}`
+   * matches what *this* request resolves to (audit H-1). Default **`true`**.
+   * Without it, a valid proof issued for one binding (e.g. a cheap route) can be
+   * replayed to admit a different route/tenant on the same btxd, since btxd's
+   * redeem can't see the HTTP request. **The `resource`/`subject`/`purpose`
+   * resolvers must be deterministic per request** for this to pass. Set to
+   * `false` only if you intentionally reuse proofs across bindings.
+   */
+  enforceBinding?: boolean;
   /** Optional hook fired on successful admission. Receives `req` + the redeem result. */
   onAdmit?: (req: Request, result: VerifyResult) => void;
   /**
@@ -171,11 +181,14 @@ async function issueAndRespond(
     const purpose = resolve(opts.purpose, req);
     const resource = resolve(opts.resource, req);
     const subject = resolve(opts.subject, req);
+    // binding fields LAST so issueParams can never override them at runtime
+    // (defense-in-depth, mirrors mcp-gateway HIGH-2) — also keeps the issued
+    // binding equal to what the H-1 redeem check re-derives.
     const challenge = await opts.client.issue({
+      ...opts.issueParams,
       purpose,
       resource,
       subject,
-      ...opts.issueParams,
     });
     res
       .status(402)
@@ -212,6 +225,19 @@ async function redeemAndAdmit(
     return;
   }
 
+  // L-7 (audit 2026-05-24): bound the attacker-controlled header before JSON.parse
+  // (legit challenges are ~3-5 KB; cap well above that).
+  if (challengeRaw.length > MAX_CHALLENGE_HEADER_BYTES) {
+    res
+      .status(400)
+      .setHeader('Content-Type', 'application/json')
+      .json({
+        error: 'challenge_header_too_large',
+        message: `${HEADER_CHALLENGE} exceeds ${MAX_CHALLENGE_HEADER_BYTES} bytes.`,
+      });
+    return;
+  }
+
   let challenge: Challenge;
   try {
     challenge = JSON.parse(challengeRaw) as Challenge;
@@ -240,9 +266,37 @@ async function redeemAndAdmit(
     return;
   }
 
+  // H-1 (audit 2026-05-24): enforce that the echoed challenge was issued for
+  // THIS request's binding. btxd's redeem only proves the challenge was
+  // locally issued + unredeemed + unexpired — it cannot see the HTTP request,
+  // so without this check a valid proof for one (resource/subject/purpose)
+  // admits a different route/tenant. Default-on; opt out with enforceBinding:false.
+  if (opts.enforceBinding !== false) {
+    const b = challenge.binding;
+    if (
+      b?.resource !== resolve(opts.resource, req) ||
+      b?.subject !== resolve(opts.subject, req) ||
+      b?.purpose !== resolve(opts.purpose, req)
+    ) {
+      res
+        .status(403)
+        .setHeader('Content-Type', 'application/json')
+        .json({
+          error: 'challenge_binding_mismatch',
+          message:
+            'Challenge binding does not match this request (resource/subject/purpose). ' +
+            'The proof was issued for a different binding.',
+        });
+      return;
+    }
+  }
+
   try {
     const result = await opts.client.redeem(challenge, nonce!, digest!);
-    if (!result.valid) {
+    // M-3 (audit 2026-05-24): strict success whitelist — admit only on
+    // valid===true AND not an explicit redeemed===false (a truthy-non-true
+    // `valid` or a verify-only `redeemed:false` must NOT admit).
+    if (result.valid !== true || result.redeemed === false) {
       res.status(403).setHeader('Content-Type', 'application/json').json({
         valid: false,
         reason: result.reason,
@@ -258,6 +312,8 @@ async function redeemAndAdmit(
     next(err);
   }
 }
+
+const MAX_CHALLENGE_HEADER_BYTES = 64 * 1024;
 
 function resolve(value: StringOrFn, req: Request): string {
   return typeof value === 'function' ? value(req) : value;

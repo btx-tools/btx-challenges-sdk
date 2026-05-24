@@ -93,6 +93,14 @@ export interface BtxAdmissionOpts {
   subject: StringOrFn;
   /** Extra issue params forwarded to `client.issue()` (target_solve_time_s, expires_in_s, etc.). */
   issueParams?: Partial<Omit<IssueParams, 'purpose' | 'resource' | 'subject'>>;
+  /**
+   * Enforce that the redeemed challenge's `binding.{resource,subject,purpose}`
+   * matches what *this* request resolves to (audit H-1). Default **`true`**.
+   * Without it, a valid proof issued for one binding can be replayed to admit a
+   * different route/tenant (btxd's redeem can't see the request). Resolvers must
+   * be deterministic per request. Set `false` only for intentional cross-binding reuse.
+   */
+  enforceBinding?: boolean;
   /** Optional hook fired on successful admission. Receives `req` + the redeem result. */
   onAdmit?: (req: FastifyRequest, result: VerifyResult) => void;
   /**
@@ -158,11 +166,13 @@ async function issueAndRespond(
     const purpose = resolve(opts.purpose, req);
     const resource = resolve(opts.resource, req);
     const subject = resolve(opts.subject, req);
+    // binding fields LAST so issueParams can't override them at runtime
+    // (defense-in-depth) + keeps the issued binding == the H-1 redeem check.
     const challenge = await opts.client.issue({
+      ...opts.issueParams,
       purpose,
       resource,
       subject,
-      ...opts.issueParams,
     });
     await reply
       .code(402)
@@ -198,6 +208,18 @@ async function redeemAndAdmit(
     return;
   }
 
+  // L-7 (audit 2026-05-24): bound the header before JSON.parse.
+  if (challengeRaw.length > MAX_CHALLENGE_HEADER_BYTES) {
+    await reply
+      .code(400)
+      .header('content-type', 'application/json')
+      .send({
+        error: 'challenge_header_too_large',
+        message: `${HEADER_CHALLENGE} exceeds ${MAX_CHALLENGE_HEADER_BYTES} bytes.`,
+      });
+    return;
+  }
+
   let challenge: Challenge;
   try {
     challenge = JSON.parse(challengeRaw) as Challenge;
@@ -226,9 +248,32 @@ async function redeemAndAdmit(
     return;
   }
 
+  // H-1 (audit 2026-05-24): enforce challenge binding matches THIS request
+  // (btxd's redeem can't see the request). Default-on; opt out via enforceBinding:false.
+  if (opts.enforceBinding !== false) {
+    const b = challenge.binding;
+    if (
+      b?.resource !== resolve(opts.resource, req) ||
+      b?.subject !== resolve(opts.subject, req) ||
+      b?.purpose !== resolve(opts.purpose, req)
+    ) {
+      await reply
+        .code(403)
+        .header('content-type', 'application/json')
+        .send({
+          error: 'challenge_binding_mismatch',
+          message:
+            'Challenge binding does not match this request (resource/subject/purpose). ' +
+            'The proof was issued for a different binding.',
+        });
+      return;
+    }
+  }
+
   try {
     const result = await opts.client.redeem(challenge, nonce!, digest!);
-    if (!result.valid) {
+    // M-3 (audit 2026-05-24): strict success whitelist.
+    if (result.valid !== true || result.redeemed === false) {
       await reply.code(403).header('content-type', 'application/json').send({
         valid: false,
         reason: result.reason,
@@ -244,6 +289,8 @@ async function redeemAndAdmit(
     throw err;
   }
 }
+
+const MAX_CHALLENGE_HEADER_BYTES = 64 * 1024;
 
 function resolve(value: StringOrFn, req: FastifyRequest): string {
   return typeof value === 'function' ? value(req) : value;
