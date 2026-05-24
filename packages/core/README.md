@@ -268,7 +268,7 @@ Post-1.0 candidates (additive, non-breaking) — Cloudflare Worker template, Wor
 ```bash
 pnpm test                # all tests
 pnpm test:unit           # msw-mocked HTTP only (fast)
-pnpm test:integration    # live btxd via SSH (requires fleet access)
+pnpm test:integration    # live btxd via SSH (requires SSH access to a BTX node)
 ```
 
 The integration test target is `btx-node` by default — change `SSH_TARGET` in `tests/integration/smoke.test.ts` to retarget any healthy at-tip BTX node.

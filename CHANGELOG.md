@@ -4,50 +4,50 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
-## [1.4.0] - 2026-05-25 — `challenges-sdk` 1.4.0 + new `matmul-webgpu@0.1.0` & `browser-miner@0.1.0`
+## [1.4.0] - 2026-05-25 â `challenges-sdk` 1.4.0 + new `matmul-webgpu@0.1.0` & `browser-miner@0.1.0`
 
 WebGPU support: a byte-exact WGSL port of the matmul service-challenge solver, a new
 SDK solve mode that uses it, and a pool-agnostic browser mining client built on top.
 All byte-exact-validated on real GPU (Deno/Metal) and deep-audited. (`challenges-sdk`
-`1.3.0` — the `mode:'webgpu'` work — was never published; this is the `1.2.0 → 1.4.0`
+`1.3.0` â the `mode:'webgpu'` work â was never published; this is the `1.2.0 â 1.4.0`
 release.)
 
 ### `@btx-tools/challenges-sdk` 1.4.0
 
-- **`Solver` `mode:'webgpu'`** — solve locally on the GPU via the optional
+- **`Solver` `mode:'webgpu'`** â solve locally on the GPU via the optional
   `@btx-tools/matmul-webgpu` kernel (byte-identical proof to `'pure-js'`/`'wasm'`).
   Requires `navigator.gpu` (browser / Deno) or a caller-supplied `opts.webgpu.device`;
   throws a clear, distinct error otherwise. The `'auto'` cascade is now
-  `rpc → webgpu → wasm → pure-js`. **Node behavior is unchanged** (no `navigator.gpu`
-  → webgpu skipped). New `WebGpuSolveOptions`; `optionalDependencies` += `matmul-webgpu`.
-- **Exports `solveJs` + `validateMatmulParams`** — the reference solver (returns
+  `rpc â webgpu â wasm â pure-js`. **Node behavior is unchanged** (no `navigator.gpu`
+  â webgpu skipped). New `WebGpuSolveOptions`; `optionalDependencies` += `matmul-webgpu`.
+- **Exports `solveJs` + `validateMatmulParams`** â the reference solver (returns
   `null` on exhaustion) and the n/b/r bounds check, now public (consumed by
   `@btx-tools/browser-miner`).
 
 ### `@btx-tools/matmul-webgpu` 0.1.0 (new)
 
-WebGPU/WGSL solver kernel — a clean-room port of `core/src/matmul/*.ts`, byte-exact at
-n=8/n=64 (multi-block transcript) and ~50× faster per matmul than the WASM solver.
+WebGPU/WGSL solver kernel â a clean-room port of `core/src/matmul/*.ts`, byte-exact at
+n=8/n=64 (multi-block transcript) and ~50Ã faster per matmul than the WASM solver.
 `createWebGpuSolver(...)` mirrors `WasmSolver`'s positional args. Dual `MIT OR Apache-2.0`.
 
 ### `@btx-tools/browser-miner` 0.1.0 (new)
 
 Pool-agnostic browser mining client for service-challenge shares: `MiningPoolAdapter`
-contract + a `BrowserMiner` loop (backend cascade `webgpu→wasm→pure-js`, vardiff, GPU
+contract + a `BrowserMiner` loop (backend cascade `webgpuâwasmâpure-js`, vardiff, GPU
 duty-cycle throttling, new-job preemption, consent-gated). Peer `challenges-sdk@^1.4.0`.
-**Honest framing:** browser mining earns ≈ nothing — engagement/decentralization, not
+**Honest framing:** browser mining earns â nothing â engagement/decentralization, not
 a money-maker. MIT.
 
-## [1.2.0] - 2026-05-24 — `challenges-sdk` 1.2.0 + middleware-\* 1.1.0 (audit remediation)
+## [1.2.0] - 2026-05-24 â `challenges-sdk` 1.2.0 + middleware-\* 1.1.0 (audit remediation)
 
 Security + correctness fixes from the 2026-05-24 org-wide deep audit (no Critical;
 this hardens the admission boundary + input validation). Coordinated minor across
-core (`1.1.1 → 1.2.0`) and all three middleware adapters (`1.0.1 → 1.1.0`, peer
+core (`1.1.1 â 1.2.0`) and all three middleware adapters (`1.0.1 â 1.1.0`, peer
 `^1.2.0`).
 
 ### Security / behavior (read before upgrading)
 
-- **H-1 — middleware now enforces challenge binding (default-on).** The adapters
+- **H-1 â middleware now enforces challenge binding (default-on).** The adapters
   re-derive `resource`/`subject`/`purpose` for the redeeming request and **deny
   `403 challenge_binding_mismatch`** if the echoed challenge's `binding` doesn't
   match. Closes a proof-reuse bypass: a valid proof issued for one binding could
@@ -55,27 +55,27 @@ core (`1.1.1 → 1.2.0`) and all three middleware adapters (`1.0.1 → 1.1.0`, p
   can't see the HTTP request). **Behavior change:** binding resolvers must be
   **deterministic per request**; opt out with `enforceBinding: false`. (The
   README's prior "btxd enforces the binding" note was wrong.)
-- **M-3 — strict admit:** adapters admit only on `result.valid === true` (and not
-  `redeemed === false`) — a truthy-non-`true` `valid` or a verify-only result no
+- **M-3 â strict admit:** adapters admit only on `result.valid === true` (and not
+  `redeemed === false`) â a truthy-non-`true` `valid` or a verify-only result no
   longer admits.
 - **issueParams can no longer override the binding** at runtime (binding fields
-  are applied last) — defense-in-depth, and keeps the issued binding equal to
+  are applied last) â defense-in-depth, and keeps the issued binding equal to
   what the H-1 check re-derives.
-- **`engines.node` → `>=20.19.0`** (was `>=18.17`). Matches the `@noble/hashes`
+- **`engines.node` â `>=20.19.0`** (was `>=18.17`). Matches the `@noble/hashes`
   floor; Node 18 is EOL. CI matrix drops 18.
 
 ### Fixed (core)
 
-- **H-3 — `issue()` uses named (object) JSON-RPC params** so omitted optionals are
+- **H-3 â `issue()` uses named (object) JSON-RPC params** so omitted optionals are
   truly absent (the positional form serialized skipped middle params as explicit
   `null`, which btxd mis-handles). Verified btxd 0.30.1 accepts named params.
-- **M-2 — `redeem`/`redeemBatch` are no longer auto-retried** (non-idempotent: a
+- **M-2 â `redeem`/`redeemBatch` are no longer auto-retried** (non-idempotent: a
   retry after a lost response gets `already_redeemed` and would falsely deny a payer).
-- **M-1 / M-5 — matmul params are bounds-checked** (`validateMatmulParams`: n≤4096,
-  r≤256) before any `n×n` allocation, in both `solveJs` and the WASM-arg mapping;
+- **M-1 / M-5 â matmul params are bounds-checked** (`validateMatmulParams`: nâ¤4096,
+  râ¤256) before any `nÃn` allocation, in both `solveJs` and the WASM-arg mapping;
   `serializeMatMulHeader` **throws** on `matmul_dim > 0xffff` instead of masking
   (which had produced silently-wrong proofs).
-- **M-6 — malformed JSON-RPC error envelopes** yield `BtxParseError`, not
+- **M-6 â malformed JSON-RPC error envelopes** yield `BtxParseError`, not
   `BtxRpcError(undefined)`.
 - **L-1** wider credential redaction (Bearer, quoted/space values, passphrase/authkey);
   **L-2** response-body size cap; **L-4** `nonce64_start` accepts `string` (u64 > 2^53);
@@ -84,23 +84,23 @@ core (`1.1.1 → 1.2.0`) and all three middleware adapters (`1.0.1 → 1.1.0`, p
   out of the redeem try/catch so post-admission handler errors don't misfire `onError`.
   **V-2** `fetch` uses `redirect: 'error'`.
 
-## [1.1.1] - 2026-05-24 — `@btx-tools/challenges-sdk` (docs only)
+## [1.1.1] - 2026-05-24 â `@btx-tools/challenges-sdk` (docs only)
 
-README/USE-CASES refresh so the npm page matches the shipped `mode: 'wasm'` — **no code, no API change.** Republished so the corrected README reaches the npm package page (1.1.0's page still framed WASM as "won't rescue / reference-only", which predated shipping the mode).
+README/USE-CASES refresh so the npm page matches the shipped `mode: 'wasm'` â **no code, no API change.** Republished so the corrected README reaches the npm package page (1.1.0's page still framed WASM as "won't rescue / reference-only", which predated shipping the mode).
 
-- Core README documents 4 Solver modes (`+'wasm'`) + the `auto` cascade; the perf note reframed (kernel shipped, ~24×, still not a casual captcha).
-- Monorepo README: `@btx-tools/matmul-wasm` sibling row + optional install; USE-CASES decision tree/summary add `wasm` rows; `examples/03` README documents the WASM bench; `BROWSER-PERF-FINDINGS` top update note. Honest framing throughout: WASM = fastest no-node solver + high-friction gates, **not** a casual 1–4 s browser captcha at the live `n=512`.
+- Core README documents 4 Solver modes (`+'wasm'`) + the `auto` cascade; the perf note reframed (kernel shipped, ~24Ã, still not a casual captcha).
+- Monorepo README: `@btx-tools/matmul-wasm` sibling row + optional install; USE-CASES decision tree/summary add `wasm` rows; `examples/03` README documents the WASM bench; `BROWSER-PERF-FINDINGS` top update note. Honest framing throughout: WASM = fastest no-node solver + high-friction gates, **not** a casual 1â4 s browser captcha at the live `n=512`.
 
-## [1.1.0] - 2026-05-24 — `@btx-tools/challenges-sdk` (WASM solver mode)
+## [1.1.0] - 2026-05-24 â `@btx-tools/challenges-sdk` (WASM solver mode)
 
 Adds an optional **WASM solver mode** backed by
-[`@btx-tools/matmul-wasm`](https://github.com/btx-tools/btx-challenges-wasm) — a
-byte-exact Rust→WASM port of btxd's matmul PoW. **Backward-compatible** (additive
+[`@btx-tools/matmul-wasm`](https://github.com/btx-tools/btx-challenges-wasm) â a
+byte-exact RustâWASM port of btxd's matmul PoW. **Backward-compatible** (additive
 mode + optional dependency); existing consumers are unaffected unless they opt in.
 
 > **Honest framing:** the WASM kernel is the **fastest JS-environment solver**
-> (~24× the pure-JS path) for **server / edge / Node** solving without a btxd. It
-> is **not** a casual browser captcha — at the live `n=512` a browser pool floor
+> (~24Ã the pure-JS path) for **server / edge / Node** solving without a btxd. It
+> is **not** a casual browser captcha â at the live `n=512` a browser pool floor
 > is ~16 s. See the kernel's README for the measured perf.
 
 ### Added
@@ -112,8 +112,8 @@ mode + optional dependency); existing consumers are unaffected unless they opt i
 
 ### Changed
 
-- **`mode: 'auto'` now prefers the WASM kernel when installed** — cascade is
-  `rpc` (if `rpcClient`) → `wasm` (if `@btx-tools/matmul-wasm` resolves) → `pure-js`.
+- **`mode: 'auto'` now prefers the WASM kernel when installed** â cascade is
+  `rpc` (if `rpcClient`) â `wasm` (if `@btx-tools/matmul-wasm` resolves) â `pure-js`.
   Previously `auto` with no client went straight to pure-js. RPC / explicit
   pure-js outcomes are unchanged; proofs are identical, just faster. The optional
   import is probed at most once per process.
@@ -122,39 +122,39 @@ mode + optional dependency); existing consumers are unaffected unless they opt i
 
 - The published `@btx-tools/matmul-wasm` build targets **browsers/bundlers**
   (Vite, Next, Workers). In **plain Node**, its `init()` can't fetch the `.wasm`
-  via `import.meta.url` — `mode: 'wasm'` then throws a distinct
+  via `import.meta.url` â `mode: 'wasm'` then throws a distinct
   "found but couldn't initialize here" error (vs the "not installed" error), and
   `mode: 'auto'` quietly falls through to pure-js. Plain-Node consumers should
   build the package's `nodejs` target from source or solve via `mode: 'rpc'`.
 
-## [1.0.3] - 2026-05-23 — `@btx-tools/challenges-sdk` (code docs)
+## [1.0.3] - 2026-05-23 â `@btx-tools/challenges-sdk` (code docs)
 
 Source-doc clarity; no behavior change. Republished so the `.d.ts` (IDE hover) carries it.
 
 - **`BtxChallengeClient` JSDoc** now states the **node prerequisite** + who needs one: the service provider always (for `issue`/`verify`/`redeem`); callers only for fast `rpc` solving (else slow pure-JS). `rpcUrl` doc notes it's a `btxd` you run (no hosted endpoint), non-mining for `rpc` solves.
-- **`SolverMode` JSDoc** de-stale'd: dropped "WASM/SIMD acceleration planned" (the 2026-05 spike concluded browser solving isn't viable) → now points to `rpc` server-side solving as the production path.
+- **`SolverMode` JSDoc** de-stale'd: dropped "WASM/SIMD acceleration planned" (the 2026-05 spike concluded browser solving isn't viable) â now points to `rpc` server-side solving as the production path.
 - Example `02-express-gate` prereqs note the non-mining requirement + link to core Prerequisites.
 
-## 2026-05-23 — docs clarity pass (core → `1.0.2`, middleware-\* → `1.0.1`)
+## 2026-05-23 â docs clarity pass (core â `1.0.2`, middleware-\* â `1.0.1`)
 
 Docs-only across the family; no code or API change. Republished so the npm package pages carry the clarity.
 
-- **`@btx-tools/challenges-sdk` (1.0.1 → 1.0.2)** — added a **"Prerequisites: you need a BTX node"** section: this SDK requires a reachable `btxd` (non-mining for ~1–4 s solves), there is no hosted/public endpoint, and pure-JS solving is minutes-to-hours at production difficulty. Makes the node requirement explicit up front.
-- **`@btx-tools/middleware-express` (1.0.0 → 1.0.1), `-fastify` (1.0.0 → 1.0.1), `-hono` (1.0.0 → 1.0.1)** — each adapter README gained a "New to BTX service challenges?" intro + a Prerequisites note (linking to the core README), so each npm page is self-explanatory. Fixed a stale `middleware-express` Status line (was "0.2.0 / peer ^0.0.1"); hono notes the edge-runtime `127.0.0.1` reachability caveat.
+- **`@btx-tools/challenges-sdk` (1.0.1 â 1.0.2)** â added a **"Prerequisites: you need a BTX node"** section: this SDK requires a reachable `btxd` (non-mining for ~1â4 s solves), there is no hosted/public endpoint, and pure-JS solving is minutes-to-hours at production difficulty. Makes the node requirement explicit up front.
+- **`@btx-tools/middleware-express` (1.0.0 â 1.0.1), `-fastify` (1.0.0 â 1.0.1), `-hono` (1.0.0 â 1.0.1)** â each adapter README gained a "New to BTX service challenges?" intro + a Prerequisites note (linking to the core README), so each npm page is self-explanatory. Fixed a stale `middleware-express` Status line (was "0.2.0 / peer ^0.0.1"); hono notes the edge-runtime `127.0.0.1` reachability caveat.
 
-## [1.0.1] - 2026-05-23 — `@btx-tools/challenges-sdk` (docs only)
+## [1.0.1] - 2026-05-23 â `@btx-tools/challenges-sdk` (docs only)
 
-README rewrite for npm-page clarity — **no code, no API change.** Republished so the improved README reaches the npm package page.
+README rewrite for npm-page clarity â **no code, no API change.** Republished so the improved README reaches the npm package page.
 
-- New "What is this?" intro: the problem (vs CAPTCHA / accounts / hosted anti-bot), an `issue → solve → redeem` ASCII flow diagram, and use cases — mirrors the monorepo README.
-- Removed stale claims that misrepresented shipped state: the "Day 2.6 WASM kernel coming (10×)" line (the WASM spike concluded browser solving isn't viable — solve server-side via `rpc`), "Fastify + Hono adapters queued" (both shipped + stable), and the day-by-day roadmap table (replaced with a "shipped & stable at 1.0.0" status + post-1.0 pointer).
+- New "What is this?" intro: the problem (vs CAPTCHA / accounts / hosted anti-bot), an `issue â solve â redeem` ASCII flow diagram, and use cases â mirrors the monorepo README.
+- Removed stale claims that misrepresented shipped state: the "Day 2.6 WASM kernel coming (10Ã)" line (the WASM spike concluded browser solving isn't viable â solve server-side via `rpc`), "Fastify + Hono adapters queued" (both shipped + stable), and the day-by-day roadmap table (replaced with a "shipped & stable at 1.0.0" status + post-1.0 pointer).
 - Test-count + perf framing refreshed.
 
 (Other packages unchanged at `1.0.0`; core peer range on middleware is `^1.0.0`, so `1.0.1` is in-range.)
 
 ## [1.0.0] - 2026-05-23
 
-**Stable API freeze.** All four `@btx-tools/*` SDK packages move to `1.0.0` together. The public API is now under [SemVer](https://semver.org/) — breaking changes require a `2.0.0`. **No code changes from `0.3.1`/`0.2.3`/`0.1.2`** — this release promotes the existing, audit-clean surface to a stability commitment.
+**Stable API freeze.** All four `@btx-tools/*` SDK packages move to `1.0.0` together. The public API is now under [SemVer](https://semver.org/) â breaking changes require a `2.0.0`. **No code changes from `0.3.1`/`0.2.3`/`0.1.2`** â this release promotes the existing, audit-clean surface to a stability commitment.
 
 ### Packages
 
@@ -167,12 +167,12 @@ README rewrite for npm-page clarity — **no code, no API change.** Republished 
 
 ### Frozen public surface
 
-- **core** — `BtxChallengeClient` (`call`/`issue`/`verify`/`redeem`/`verifyBatch`/`redeemBatch`/`solve`, all with optional trailing `RpcCallOpts`), `Solver`, the six `Btx*Error` classes, and the option/challenge/result types (`BtxClientOpts`, `RetryOptions`, `RpcCallOpts`, `IssueParams`, the `Challenge*` type family, `SolverOptions`/`SolverMode`/`SolveJsOptions`, `SolverOutput`, `VerifyResult`/`VerifyReason`, `BatchEntry`/`BatchResult`). Verified: no internal symbols leak (e.g. `CallerAbortError` stays private).
-- **middleware (express / fastify / hono)** — `btxAdmission`, `BtxAdmissionOpts`, `StringOrFn`, the `HEADER_*` constants (+ hono's `BtxAdmissionVariables`). Peer dependency pinned to `@btx-tools/challenges-sdk@^1.0.0`.
+- **core** â `BtxChallengeClient` (`call`/`issue`/`verify`/`redeem`/`verifyBatch`/`redeemBatch`/`solve`, all with optional trailing `RpcCallOpts`), `Solver`, the six `Btx*Error` classes, and the option/challenge/result types (`BtxClientOpts`, `RetryOptions`, `RpcCallOpts`, `IssueParams`, the `Challenge*` type family, `SolverOptions`/`SolverMode`/`SolveJsOptions`, `SolverOutput`, `VerifyResult`/`VerifyReason`, `BatchEntry`/`BatchResult`). Verified: no internal symbols leak (e.g. `CallerAbortError` stays private).
+- **middleware (express / fastify / hono)** â `btxAdmission`, `BtxAdmissionOpts`, `StringOrFn`, the `HEADER_*` constants (+ hono's `BtxAdmissionVariables`). Peer dependency pinned to `@btx-tools/challenges-sdk@^1.0.0`.
 
 ### Stability notes
 
-- Backwards-compatible with `0.3.x` consumers — no signature or behavior changes; upgrading is a version bump.
+- Backwards-compatible with `0.3.x` consumers â no signature or behavior changes; upgrading is a version bump.
 - All findings across every SDK audit + the `mcp-gateway` audit are closed.
 - API reference: https://btx-tools.github.io/btx-challenges-sdk/
 
@@ -180,17 +180,17 @@ README rewrite for npm-page clarity — **no code, no API change.** Republished 
 
 Audit-resolution release (deep audit of `0.3.0` + Phase 5 docs). All fixes are backwards-compatible; no behavior change for existing code beyond a stricter retry-delay cap.
 
-### Fixed — `@btx-tools/challenges-sdk` (0.3.0 → 0.3.1)
+### Fixed â `@btx-tools/challenges-sdk` (0.3.0 â 0.3.1)
 
-- **M-1: API-reference docs shipped a broken install scope.** Source JSDoc in `src/index.ts` + `src/solver.ts` still referenced the old, non-existent `@btx/challenges-sdk` scope — which TypeDoc rendered into the published API reference (an uninstallable `npm install`). Corrected to `@btx-tools/challenges-sdk`.
+- **M-1: API-reference docs shipped a broken install scope.** Source JSDoc in `src/index.ts` + `src/solver.ts` still referenced the old, non-existent `@btx/challenges-sdk` scope â which TypeDoc rendered into the published API reference (an uninstallable `npm install`). Corrected to `@btx-tools/challenges-sdk`.
 - **M-2: `SolverOptions` now exported.** It was referenced by `Solver.solve` but not re-exported, so it was dropped from the generated docs and unavailable to consumers. Now `export`ed from the package root.
-- **L-1: `SEMANTIC_TIMEOUT_ALIAS` is now a null-prototype object.** A `methodTimeouts` lookup keyed by an inherited name (`__proto__`, `constructor`, …) previously returned an `Object.prototype` member instead of `undefined`. Not exploitable (method names come from caller code, not request data), but a soundness wart — fixed with `Object.create(null)`.
-- **L-2: retry-delay cap now applied after jitter.** With `jitter: true`, the delay (and the value reported to `onRetry`) could reach `60s + baseDelayMs`. The 60s cap is now applied last, so the slept delay never exceeds it — matching the documented behavior.
+- **L-1: `SEMANTIC_TIMEOUT_ALIAS` is now a null-prototype object.** A `methodTimeouts` lookup keyed by an inherited name (`__proto__`, `constructor`, â¦) previously returned an `Object.prototype` member instead of `undefined`. Not exploitable (method names come from caller code, not request data), but a soundness wart â fixed with `Object.create(null)`.
+- **L-2: retry-delay cap now applied after jitter.** With `jitter: true`, the delay (and the value reported to `onRetry`) could reach `60s + baseDelayMs`. The 60s cap is now applied last, so the slept delay never exceeds it â matching the documented behavior.
 
-### Fixed — middleware (`-express` 0.2.2 → 0.2.3, `-fastify`/`-hono` 0.1.1 → 0.1.2)
+### Fixed â middleware (`-express` 0.2.2 â 0.2.3, `-fastify`/`-hono` 0.1.1 â 0.1.2)
 
-- **M-2: `StringOrFn` now exported** from each adapter — it's the type of the `purpose`/`resource`/`subject` resolver options but was previously package-private (undocumented).
-- **L-4: peer-dependency range widened** to `… || ^0.2.0 || ^0.3.0` so installing alongside core `0.2.x`/`0.3.x` no longer emits an unmet-peer warning.
+- **M-2: `StringOrFn` now exported** from each adapter â it's the type of the `purpose`/`resource`/`subject` resolver options but was previously package-private (undocumented).
+- **L-4: peer-dependency range widened** to `â¦ || ^0.2.0 || ^0.3.0` so installing alongside core `0.2.x`/`0.3.x` no longer emits an unmet-peer warning.
 
 ### Tooling
 
@@ -199,18 +199,18 @@ Audit-resolution release (deep audit of `0.3.0` + Phase 5 docs). All fixes are b
 
 ## [0.3.0] - 2026-05-23
 
-Minor release — lands the two additive API features deferred from the `0.1.1`/`0.2.0` audits (L-3 + L-4). Backwards-compatible with `0.2.0`: both are optional, no signature changes, no behavior change for code that doesn't opt in.
+Minor release â lands the two additive API features deferred from the `0.1.1`/`0.2.0` audits (L-3 + L-4). Backwards-compatible with `0.2.0`: both are optional, no signature changes, no behavior change for code that doesn't opt in.
 
-### Added — `@btx-tools/challenges-sdk` (0.2.0 → 0.3.0)
+### Added â `@btx-tools/challenges-sdk` (0.2.0 â 0.3.0)
 
-- **`RetryOptions.onRetry?: (attempt, error, nextDelayMs) => void`** (audit L-3) — observability hook fired once per scheduled retry, **before** the backoff sleep, with:
-  - `attempt` — 1-indexed retry number (1 = first retry after the initial call)
-  - `error` — the retryable error from the just-failed attempt (`BtxNetworkError` or a 5xx `BtxHttpError`)
-  - `nextDelayMs` — the exact delay (post-jitter) about to be slept
+- **`RetryOptions.onRetry?: (attempt, error, nextDelayMs) => void`** (audit L-3) â observability hook fired once per scheduled retry, **before** the backoff sleep, with:
+  - `attempt` â 1-indexed retry number (1 = first retry after the initial call)
+  - `error` â the retryable error from the just-failed attempt (`BtxNetworkError` or a 5xx `BtxHttpError`)
+  - `nextDelayMs` â the exact delay (post-jitter) about to be slept
 
-  Fires only for retryable failures (non-retryable errors throw before another attempt is scheduled). If the caller's `AbortSignal` fires during the subsequent sleep, the retry is still abandoned — the hook reports intent-to-retry, not success. A throw inside the callback propagates out of the client call; keep it cheap.
+  Fires only for retryable failures (non-retryable errors throw before another attempt is scheduled). If the caller's `AbortSignal` fires during the subsequent sleep, the retry is still abandoned â the hook reports intent-to-retry, not success. A throw inside the callback propagates out of the client call; keep it cheap.
 
-- **Semantic shortcut keys for `methodTimeouts`** (audit L-4) — in addition to raw btxd RPC method names, `methodTimeouts` now accepts semantic aliases:
+- **Semantic shortcut keys for `methodTimeouts`** (audit L-4) â in addition to raw btxd RPC method names, `methodTimeouts` now accepts semantic aliases:
 
   | semantic      | raw RPC method                |
   | ------------- | ----------------------------- |
@@ -221,24 +221,24 @@ Minor release — lands the two additive API features deferred from the `0.1.1`/
   | `redeemBatch` | `redeemmatmulserviceproofs`   |
   | `solve`       | `solvematmulservicechallenge` |
 
-  e.g. `{ solve: 1_000_000 }` instead of `{ solvematmulservicechallenge: 1_000_000 }`. A raw-method key always wins over its semantic alias (more specific). The existing `≤ 0 = no override` rule (audit M-1) is preserved at every resolution level.
+  e.g. `{ solve: 1_000_000 }` instead of `{ solvematmulservicechallenge: 1_000_000 }`. A raw-method key always wins over its semantic alias (more specific). The existing `â¤ 0 = no override` rule (audit M-1) is preserved at every resolution level.
 
 ### Test delta
 
-168 → 176 tests (+8): four for `onRetry` (fires per-retry with 1-indexed attempt + retryable error; not called when `max: 0`; exact post-backoff delay series; never fires on a 4xx), four for semantic aliases (`solve` alias applies; raw key beats alias; alias `≤ 0` falls through; `issue` alias applies).
+168 â 176 tests (+8): four for `onRetry` (fires per-retry with 1-indexed attempt + retryable error; not called when `max: 0`; exact post-backoff delay series; never fires on a 4xx), four for semantic aliases (`solve` alias applies; raw key beats alias; alias `â¤ 0` falls through; `issue` alias applies).
 
 ### Notes
 
 - Both features close the last two deferred audit items; no remaining audit findings block a `1.0.0` API freeze.
-- Only `@btx-tools/challenges-sdk` changes — middleware (express/fastify/hono) + `mcp-gateway` are unaffected (the new options are additive and read inside core).
+- Only `@btx-tools/challenges-sdk` changes â middleware (express/fastify/hono) + `mcp-gateway` are unaffected (the new options are additive and read inside core).
 
 ## [0.2.0] - 2026-05-23
 
-Minor release — adds AbortSignal plumbing across the public client surface. Backwards-compatible with `0.1.1` (all new args are optional and trailing).
+Minor release â adds AbortSignal plumbing across the public client surface. Backwards-compatible with `0.1.1` (all new args are optional and trailing).
 
-### Added — `@btx-tools/challenges-sdk` (0.1.1 → 0.2.0)
+### Added â `@btx-tools/challenges-sdk` (0.1.1 â 0.2.0)
 
-- **`RpcCallOpts`** — new exported type. Currently has one field: `signal?: AbortSignal`. Open-shape so future per-call options (per-call header overrides, per-call timeout overrides) can land additively without another version bump.
+- **`RpcCallOpts`** â new exported type. Currently has one field: `signal?: AbortSignal`. Open-shape so future per-call options (per-call header overrides, per-call timeout overrides) can land additively without another version bump.
 - **`signal?: AbortSignal` plumbed end-to-end** through every public client method:
   - `client.call<T>(method, params?, opts?)`
   - `client.issue(params, opts?)`
@@ -249,9 +249,9 @@ Minor release — adds AbortSignal plumbing across the public client surface. Ba
   - `client.solve(challenge, opts?)`
 
   Behavior: external signal is composed with the internal timeout AbortController. If the external signal fires:
-  - **Before fetch starts** (or before call enters retry loop) → throws `BtxNetworkError` immediately, no request sent
-  - **During fetch** → underlying fetch is aborted, throws `BtxNetworkError` (distinguishable from `BtxTimeoutError` — the cause is a `CallerAbortError` not an internal timer)
-  - **During retry backoff sleep** → backoff is interrupted, retry loop exits, throws `BtxNetworkError`. No further requests sent.
+  - **Before fetch starts** (or before call enters retry loop) â throws `BtxNetworkError` immediately, no request sent
+  - **During fetch** â underlying fetch is aborted, throws `BtxNetworkError` (distinguishable from `BtxTimeoutError` â the cause is a `CallerAbortError` not an internal timer)
+  - **During retry backoff sleep** â backoff is interrupted, retry loop exits, throws `BtxNetworkError`. No further requests sent.
 
   Caveat for `redeem` / `redeemBatch`: if the abort fires AFTER btxd has consumed the challenge (RPC completed server-side before the local fetch was aborted), the redemption stands. Callers handling cancellation should verify via a separate `verify()` if post-abort state matters.
 
@@ -261,7 +261,7 @@ Closes audit MED-8 from `internal notes`. The MCP gateway needed to forward its 
 
 ### Test delta
 
-161 → 168 tests (+7 new abort-specific tests covering: pre-aborted signal fast-path, mid-fetch abort, internal-timeout vs external-abort disambiguation, abort during retry backoff, no-abort regression, signal propagation through `issue()` + `redeem()`).
+161 â 168 tests (+7 new abort-specific tests covering: pre-aborted signal fast-path, mid-fetch abort, internal-timeout vs external-abort disambiguation, abort during retry backoff, no-abort regression, signal propagation through `issue()` + `redeem()`).
 
 ### Deferred (still queued for a later minor)
 
@@ -272,65 +272,65 @@ Both can land in a `0.2.x` patch or `0.3.0` minor without breaking 0.2.0 consume
 
 ### Added
 
-- **`examples/` directory** — three runnable adopter examples at workspace root:
-  - `examples/01-basic-roundtrip` — Node script: `client.issue() → Solver.solve() → client.redeem()`, RPC mode primary, pure-JS fallback
-  - `examples/02-express-gate` — Express server gating `POST /v1/generate` with `btxAdmission`, plus a Node client that walks the 402→solve→200→403-replay flow
-  - `examples/03-browser-solver` — Vite browser page **demonstrating the wire protocol** from a browser. **Reference only, not a production captcha** — see `USE-CASES.md`.
-- **`USE-CASES.md`** — workspace-root decision tree mapping deployment scenarios to recommended SDK modes. Required reading before integration. Explicitly carves out "browser captcha widget" as **not viable** with the current matmul proof primitive.
-- **`BROWSER-PERF-FINDINGS-2026-05-23.md`** — findings doc recording the WASM spike results (`~/code/btx-challenges-wasm/`, byte-equal cross-validation, 24.5× WASM speedup on the dot-product hot loop). Concludes: browser captcha at 1-4s is **not achievable** with the current proof — no combination of WASM + SIMD + multi-worker closes the ~1000× gap. Browser-friendly proof primitive is an upstream BTX protocol question, tracked separately.
-- **`TROUBLESHOOTING.md`** — three new entries: `examples-need-service-challenge-rpcs`, `browser-pure-js-perf`, and `cors-x-btx-challenge-hidden`
-- **Workspace `pnpm-workspace.yaml`** — `examples/*` glob added so example workspaces resolve SDK packages via symlink
-- **Per-middleware READMEs** — cross-links to `examples/02-express-gate`
+- **`examples/` directory** â three runnable adopter examples at workspace root:
+  - `examples/01-basic-roundtrip` â Node script: `client.issue() â Solver.solve() â client.redeem()`, RPC mode primary, pure-JS fallback
+  - `examples/02-express-gate` â Express server gating `POST /v1/generate` with `btxAdmission`, plus a Node client that walks the 402âsolveâ200â403-replay flow
+  - `examples/03-browser-solver` â Vite browser page **demonstrating the wire protocol** from a browser. **Reference only, not a production captcha** â see `USE-CASES.md`.
+- **`USE-CASES.md`** â workspace-root decision tree mapping deployment scenarios to recommended SDK modes. Required reading before integration. Explicitly carves out "browser captcha widget" as **not viable** with the current matmul proof primitive.
+- **`BROWSER-PERF-FINDINGS-2026-05-23.md`** â findings doc recording the WASM spike results (`~/code/btx-challenges-wasm/`, byte-equal cross-validation, 24.5Ã WASM speedup on the dot-product hot loop). Concludes: browser captcha at 1-4s is **not achievable** with the current proof â no combination of WASM + SIMD + multi-worker closes the ~1000Ã gap. Browser-friendly proof primitive is an upstream BTX protocol question, tracked separately.
+- **`TROUBLESHOOTING.md`** â three new entries: `examples-need-service-challenge-rpcs`, `browser-pure-js-perf`, and `cors-x-btx-challenge-hidden`
+- **Workspace `pnpm-workspace.yaml`** â `examples/*` glob added so example workspaces resolve SDK packages via symlink
+- **Per-middleware READMEs** â cross-links to `examples/02-express-gate`
 
 ### Repositioning (important)
 
 The workspace README + `USE-CASES.md` reframe the SDK as **server-side admission middleware**. The 0.x and 1.0.0 releases serve adopters who run a btxd alongside their gate (`mode: 'rpc'` for sub-second solves). Browser-side solving is a reference implementation, not a captcha widget. This is a deliberate scope tightening based on the 2026-05-23 WASM spike measurement.
 
-No package version bumps — examples are not published to npm.
+No package version bumps â examples are not published to npm.
 
 ## [0.1.1] - 2026-05-23
 
-Patch release addressing all findings from the **2026-05-23 deep audit** (see `BTX/audits/btx-challenges-sdk-audit-2026-05-23.md`). 3 HIGH + 7 MEDIUM + 5 LOW closed; 2 LOW deferred to `0.2.0` (additive API features); 4 findings explicitly declined with rationale.
+Patch release addressing all findings from the **2026-05-23 deep audit** (see internal audit notes). 3 HIGH + 7 MEDIUM + 5 LOW closed; 2 LOW deferred to `0.2.0` (additive API features); 4 findings explicitly declined with rationale.
 
 Backwards-compatible: no API removals, no signature changes. Recommended upgrade for all `0.1.0` consumers.
 
-### @btx-tools/challenges-sdk (0.1.0 → 0.1.1)
+### @btx-tools/challenges-sdk (0.1.0 â 0.1.1)
 
 #### Bug fixes
 
 - **H-1**: `retry.max` is now clamped via `Math.max(0, Math.floor(Number(retry.max) || 0))`. Previously, a negative or `NaN` `max` value caused the retry loop to skip entirely, throwing `undefined` (not a `BtxError`). Now the call always runs at least once and throws a real `BtxError` on failure.
-- **M-1**: `methodTimeouts[method] ≤ 0` and `timeoutMs ≤ 0` now fall through to the next layer (per-method → client-wide → 30 s default) instead of being treated as "instant abort." Previously, `methodTimeouts: { x: 0 }` would abort the request immediately on first tick, almost certainly not what the caller intended.
+- **M-1**: `methodTimeouts[method] â¤ 0` and `timeoutMs â¤ 0` now fall through to the next layer (per-method â client-wide â 30 s default) instead of being treated as "instant abort." Previously, `methodTimeouts: { x: 0 }` would abort the request immediately on first tick, almost certainly not what the caller intended.
 - **M-2**: retry delay is now capped at `MAX_RETRY_DELAY_MS = 60_000` (60 s). Previously, a high `retry.max` with large `baseDelayMs` could schedule individual retry delays in the hours/days range.
 
 #### Documentation
 
-- **M-3**: inline comment on `Math.random()` jitter — non-security context (matches A-3 convention from the 2026-05-22 audit).
+- **M-3**: inline comment on `Math.random()` jitter â non-security context (matches A-3 convention from the 2026-05-22 audit).
 - **M-1 + M-2**: JSDoc on `BtxClientOpts.timeoutMs` / `methodTimeouts` / `RetryOptions.max` / `RetryOptions.baseDelayMs` updated with new clamp + cap semantics.
 
 #### Tests
 
-- 6 new unit tests for the H-1, M-2, M-5, M-6 cases. Core test count: 152 → 158.
+- 6 new unit tests for the H-1, M-2, M-5, M-6 cases. Core test count: 152 â 158.
 
 #### Deferred to `0.2.0` (additive feature work)
 
 - **L-3**: `onRetry?: (attempt, err, nextDelayMs) => void` observability callback
 - **L-4**: semantic shortcut keys for `methodTimeouts` (e.g., `{ solve: ... }` in addition to raw RPC names)
 
-### @btx-tools/middleware-express (0.2.1 → 0.2.2)
+### @btx-tools/middleware-express (0.2.1 â 0.2.2)
 
-- **L-5**: new "CORS" subsection in README — explicit guidance on `allowedHeaders` + `exposedHeaders` for browser-originated fetches with the custom BTX headers.
+- **L-5**: new "CORS" subsection in README â explicit guidance on `allowedHeaders` + `exposedHeaders` for browser-originated fetches with the custom BTX headers.
 
-### @btx-tools/middleware-fastify (0.1.0 → 0.1.1)
+### @btx-tools/middleware-fastify (0.1.0 â 0.1.1)
 
 - **M-7**: inline comment on `headerValue` helper confirming first-occurrence selection on duplicate headers is intentional (matches standard proxy behavior).
-- **L-5**: new "CORS" subsection in README — `@fastify/cors` configuration.
+- **L-5**: new "CORS" subsection in README â `@fastify/cors` configuration.
 
-### @btx-tools/middleware-hono (0.1.0 → 0.1.1)
+### @btx-tools/middleware-hono (0.1.0 â 0.1.1)
 
-- **H-2**: new "⚠️ Body consumption" subsection in README — explicit warning about Hono's one-shot `c.req.json()`, with concrete failure example + two safe patterns (cache-body-in-context, derive-from-headers).
-- **H-3**: rewrote "Edge-runtime notes" → adds new "Network reachability" subsection: explicit note that edge runtimes can't reach `127.0.0.1` and need Cloudflare Tunnel / public RPC proxy / public-IP relay. Per-runtime notes also tightened (no specific header-size number; cite "consult your platform's docs" instead).
-- **L-2**: removed inaccurate Vercel Edge "16 KB cap" claim — replaced with neutral "limits vary across edge platforms" guidance.
-- **L-5**: new "CORS" subsection in README — `hono/cors` configuration.
+- **H-2**: new "â ï¸ Body consumption" subsection in README â explicit warning about Hono's one-shot `c.req.json()`, with concrete failure example + two safe patterns (cache-body-in-context, derive-from-headers).
+- **H-3**: rewrote "Edge-runtime notes" â adds new "Network reachability" subsection: explicit note that edge runtimes can't reach `127.0.0.1` and need Cloudflare Tunnel / public RPC proxy / public-IP relay. Per-runtime notes also tightened (no specific header-size number; cite "consult your platform's docs" instead).
+- **L-2**: removed inaccurate Vercel Edge "16 KB cap" claim â replaced with neutral "limits vary across edge platforms" guidance.
+- **L-5**: new "CORS" subsection in README â `hono/cors` configuration.
 
 ### F-5 honesty pass (M-4)
 
@@ -338,22 +338,22 @@ The F-5 gate added in `0.1.0` is a **ceiling gate**, not a true regression gate 
 
 ### Findings explicitly declined (with rationale, full detail in audit doc)
 
-- **M-8** middleware peer-floor tightness (`^0.0.4` instead of `^0.0.1`) — cosmetic; current range works
-- **M-9** source maps without source files in tarball — standard npm convention
-- **L-6** `as unknown as BtxChallengeClient` in test mocks — standard test idiom
-- **L-7** Middleware `kind` field validation — would BREAK on future btxd `kind` evolution; defensive validation is the wrong move
+- **M-8** middleware peer-floor tightness (`^0.0.4` instead of `^0.0.1`) â cosmetic; current range works
+- **M-9** source maps without source files in tarball â standard npm convention
+- **L-6** `as unknown as BtxChallengeClient` in test mocks â standard test idiom
+- **L-7** Middleware `kind` field validation â would BREAK on future btxd `kind` evolution; defensive validation is the wrong move
 
 ## [0.1.0] - 2026-05-23
 
 Phase 2 release per `BTX/ecosystem/sdk-finishing-plan-2026-05-22.md`. Adds two new framework adapters, closes the remaining 0.1.x audit items, and ships the perf-regression CI gate. Backward-compatible with `0.0.4`: existing consumers of `@btx-tools/challenges-sdk` need no code changes.
 
-### @btx-tools/challenges-sdk (0.0.4 → 0.1.0)
+### @btx-tools/challenges-sdk (0.0.4 â 0.1.0)
 
-- **D-4: per-method timeout** — new `methodTimeouts?: Record<string, number>` option on `BtxClientOpts`. Falls back to client-wide `timeoutMs`, then 30 s default. Useful for the `solvematmulservicechallenge` RPC which can take 15+ minutes on mining-loaded btxd ((internal reference)) vs ~50 ms for `getmatmulservicechallenge`. 4 new tests.
-- **D-3: retry/backoff** — new `retry?: RetryOptions` option on `BtxClientOpts`. Opt-in (default `{ max: 0 }`). Exponential backoff with optional jitter. Retries only on transient failures (`BtxNetworkError`, `BtxHttpError` ≥ 500); never on 4xx, JSON-RPC errors, parse errors, or timeouts. 6 new tests.
-- **F-5: perf-regression CI gate** — new `tests/perf/bench.test.ts` benchmarks `canonicalMatMul(n=64, b=8)` and `deriveCompressionVector(b=8)` against generous ceilings (~5× local M-series baseline) to absorb GitHub Actions runner variance. New `test:perf` script + CI step gated to Node 22 for baseline consistency.
+- **D-4: per-method timeout** â new `methodTimeouts?: Record<string, number>` option on `BtxClientOpts`. Falls back to client-wide `timeoutMs`, then 30 s default. Useful for the `solvematmulservicechallenge` RPC which can take 15+ minutes on mining-loaded btxd ((the solve RPC shares the matmul backend with mining — point at a dedicated non-mining node)) vs ~50 ms for `getmatmulservicechallenge`. 4 new tests.
+- **D-3: retry/backoff** â new `retry?: RetryOptions` option on `BtxClientOpts`. Opt-in (default `{ max: 0 }`). Exponential backoff with optional jitter. Retries only on transient failures (`BtxNetworkError`, `BtxHttpError` â¥ 500); never on 4xx, JSON-RPC errors, parse errors, or timeouts. 6 new tests.
+- **F-5: perf-regression CI gate** â new `tests/perf/bench.test.ts` benchmarks `canonicalMatMul(n=64, b=8)` and `deriveCompressionVector(b=8)` against generous ceilings (~5Ã local M-series baseline) to absorb GitHub Actions runner variance. New `test:perf` script + CI step gated to Node 22 for baseline consistency.
 - `RetryOptions` interface exported from package root.
-- Test count: 142 → 152 unit + 2 perf bench.
+- Test count: 142 â 152 unit + 2 perf bench.
 
 ### @btx-tools/middleware-fastify (NEW: 0.1.0)
 
@@ -363,7 +363,7 @@ First Fastify adapter. Mirrors the behavior of `@btx-tools/middleware-express` f
 
 First Hono adapter. Works on Node, Deno, Bun, **Cloudflare Workers**, Vercel Edge, etc. Same stateless echo-the-challenge flow, ported to Hono's middleware model + `c.set('btx', ...)` variables. See [`packages/middleware-hono/CHANGELOG.md`](packages/middleware-hono/CHANGELOG.md). 11 unit tests via Hono's `app.request()` (Web fetch API).
 
-### @btx-tools/middleware-express (0.2.0 → 0.2.1)
+### @btx-tools/middleware-express (0.2.0 â 0.2.1)
 
 Peer-dep widening only. Now compatible with both `@btx-tools/challenges-sdk ^0.0.1` AND `^0.1.0`. No behavioral changes. Existing 0.2.0 installs continue to work unchanged.
 
@@ -371,15 +371,15 @@ Peer-dep widening only. Now compatible with both `@btx-tools/challenges-sdk ^0.0
 
 ### @btx-tools/challenges-sdk
 
-- **B-3 / risk 6 CLOSED**: pure-JS proof-shape live roundtrip validated end-to-end against a live btxd. The existing pure-JS lifecycle test in `packages/core/tests/integration/solve-redeem.test.ts:145-178` ran against btx-node (mine-loop paused, RPC tunneled to Mac, btxd floor difficulty `target_solve_time_s=0.001 + min_solve_time_s=0.001`) and passed in 421 s: `issue → Solver.solve({ mode: 'pure-js' }) → client.redeem` returns `valid: true, reason: 'ok', redeemed: true`. Confirms btxd's `verifymatmulserviceproof` accepts the pure-TS-generated proof shape that we derived from reading btxd's RPC handler source in 0.0.1. Closes the only remaining algorithm-correctness gap from the `[0.0.2] § Still deferred` carry-over and audit `B-3` in `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`.
+- **B-3 / risk 6 CLOSED**: pure-JS proof-shape live roundtrip validated end-to-end against a live btxd. The existing pure-JS lifecycle test in `packages/core/tests/integration/solve-redeem.test.ts:145-178` ran against btx-node (mine-loop paused, RPC tunneled to Mac, btxd floor difficulty `target_solve_time_s=0.001 + min_solve_time_s=0.001`) and passed in 421 s: `issue â Solver.solve({ mode: 'pure-js' }) â client.redeem` returns `valid: true, reason: 'ok', redeemed: true`. Confirms btxd's `verifymatmulserviceproof` accepts the pure-TS-generated proof shape that we derived from reading btxd's RPC handler source in 0.0.1. Closes the only remaining algorithm-correctness gap from the `[0.0.2] Â§ Still deferred` carry-over and audit `B-3` in internal audit notes.
 
-  **Auxiliary tests (replay-rejection + auto-mode-fallback) attempted but did not complete cleanly** in this run window: test 2 hit the 75-min `PURE_JS_TIMEOUT_MS` per-test ceiling (random-variance attempt count exceeded budget at floor difficulty); test 3 fetch-failed when the SSH tunnel to the target btxd dropped despite keepalive after ~2 h NAT pressure. **Both failures are infrastructure, not algorithm.** Re-running on a dedicated DO droplet target (per `(internal reference)`) instead of an a paused-mining node is the suggested follow-up for full 3/3 coverage; the lifecycle test alone is the canonical B-3 closure.
+  **Auxiliary tests (replay-rejection + auto-mode-fallback) attempted but did not complete cleanly** in this run window: test 2 hit the 75-min `PURE_JS_TIMEOUT_MS` per-test ceiling (random-variance attempt count exceeded budget at floor difficulty); test 3 fetch-failed when the SSH tunnel to the target btxd dropped despite keepalive after ~2 h NAT pressure. **Both failures are infrastructure, not algorithm.** Re-running on a dedicated DO droplet target (per `(the solve RPC shares the matmul backend with mining — point at a dedicated non-mining node)`) instead of an a paused-mining node is the suggested follow-up for full 3/3 coverage; the lifecycle test alone is the canonical B-3 closure.
 
-  No code changes in this entry — the algorithm was already locked at unit level via 5 byte-equal goldens in `tests/unit/matmul/btxd-vectors.test.ts` (0.0.1); this is purely the live validation that was deferred from `[0.0.2] § Still deferred`.
+  No code changes in this entry â the algorithm was already locked at unit level via 5 byte-equal goldens in `tests/unit/matmul/btxd-vectors.test.ts` (0.0.1); this is purely the live validation that was deferred from `[0.0.2] Â§ Still deferred`.
 
 ## [0.0.3] - 2026-05-22
 
-Audit-resolution release. All non-breaking findings from the 2026-05-22 deep audit (`BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`) addressed at this version. Middleware breaking change ships as a parallel `middleware-express 0.2.0`.
+Audit-resolution release. All non-breaking findings from the 2026-05-22 deep audit (internal audit notes) addressed at this version. Middleware breaking change ships as a parallel `middleware-express 0.2.0`.
 
 ### @btx-tools/challenges-sdk
 
@@ -387,12 +387,12 @@ Audit-resolution release. All non-breaking findings from the 2026-05-22 deep aud
 - **A-3**: inline comment on `Math.random` fallback in `client.ts:66` documenting that it's NOT a security context (request-id correlation only).
 - **B-5**: new tests cover the nonce-overflow branch in `pow.ts` (start at `MAX_U64`, start at `MAX_U64 - 2n` with wraparound budget).
 - **B-6**: `attemptInterval` callback test parameterized across `[1, 2, 5, 10]`.
-- **B-4 / F-3**: parameterized `canonicalMatMul` sweep across (n=16,b=2,r=1), (n=16,b=4,r=2), (n=16,b=2,r=4), (n=32,b=4,r=2), (n=32,b=8,r=4), (n=64,b=8,r=4) — locks regression coverage on non-default matmul shapes.
-- Net unit test count: 130 → 142.
+- **B-4 / F-3**: parameterized `canonicalMatMul` sweep across (n=16,b=2,r=1), (n=16,b=4,r=2), (n=16,b=2,r=4), (n=32,b=4,r=2), (n=32,b=8,r=4), (n=64,b=8,r=4) â locks regression coverage on non-default matmul shapes.
+- Net unit test count: 130 â 142.
 
 ## [middleware-express 0.2.0] - 2026-05-22 (BREAKING)
 
-⚠️ **Breaking change**: `Express.Request.btxResult` → `req.btx.result`. Migration:
+â ï¸ **Breaking change**: `Express.Request.btxResult` â `req.btx.result`. Migration:
 
 ```diff
 - console.log(req.btxResult?.reason);
@@ -401,14 +401,14 @@ Audit-resolution release. All non-breaking findings from the 2026-05-22 deep aud
 
 ### Added
 
-- **D-1**: `BtxAdmissionOpts.onError?: (err: unknown, req: Request) => void` — observability hook fired once when `client.issue()` or `client.redeem()` throws, before `next(err)` runs. Includes 3 new unit tests (issue throws → fires; redeem throws → fires; 403 reject → does NOT fire).
+- **D-1**: `BtxAdmissionOpts.onError?: (err: unknown, req: Request) => void` â observability hook fired once when `client.issue()` or `client.redeem()` throws, before `next(err)` runs. Includes 3 new unit tests (issue throws â fires; redeem throws â fires; 403 reject â does NOT fire).
 - **G-1**: `package.json` declares `"sideEffects": false`.
 - **C-2**: README API table now documents `isProofPresent`.
 - **A-5**: README has a new "Error handling" section recommending a custom Express error handler that doesn't leak server-side details.
 
 ### Changed (breaking)
 
-- **C-3**: `req.btxResult: VerifyResult` → `req.btx: { result: VerifyResult }`. Reduces global `Express.Request` augmentation pollution and groups future BTX middleware state under a single namespace.
+- **C-3**: `req.btxResult: VerifyResult` â `req.btx: { result: VerifyResult }`. Reduces global `Express.Request` augmentation pollution and groups future BTX middleware state under a single namespace.
 
 ### Migration
 
@@ -424,16 +424,16 @@ If you don't read `req.btxResult` in your handlers, no migration needed.
 
 ### Tests
 
-15 → 18 unit tests (3 new for `onError` hook + namespace updates throughout).
+15 â 18 unit tests (3 new for `onError` hook + namespace updates throughout).
 
 ## [0.0.2] - 2026-05-22
 
-Closes 2 of 3 deferred risks from `[0.0.1]`. Risk 6 (pure-JS proof-shape live roundtrip) stays open — closure deferred to 0.0.3.
+Closes 2 of 3 deferred risks from `[0.0.1]`. Risk 6 (pure-JS proof-shape live roundtrip) stays open â closure deferred to 0.0.3.
 
 ### Verified live
 
-- **Risk 1 closed**: `tests/integration/solve-redeem.test.ts` RPC-mode lifecycle test ran end-to-end against a live btxd (issue → `Solver.solve({ mode: 'rpc' })` → `client.redeem` → `result.valid: true`). Full HTTP/JSON-RPC contract + Basic auth + redeem path now empirically validated, not just msw-mocked.
-- **Risk 2 closed**: cross-engine perf bench captured for Node 22 / V8 (4.6 s/attempt — baseline), Deno 2.7 / V8 (4.2 s/attempt — within noise), Bun 1.3 / JavaScriptCore (9.8 s/attempt — **2.1× slower than V8** for BigInt-heavy M31 arithmetic). README § Performance updated with a cross-engine table + per-engine expected solve times at floor difficulty.
+- **Risk 1 closed**: `tests/integration/solve-redeem.test.ts` RPC-mode lifecycle test ran end-to-end against a live btxd (issue â `Solver.solve({ mode: 'rpc' })` â `client.redeem` â `result.valid: true`). Full HTTP/JSON-RPC contract + Basic auth + redeem path now empirically validated, not just msw-mocked.
+- **Risk 2 closed**: cross-engine perf bench captured for Node 22 / V8 (4.6 s/attempt â baseline), Deno 2.7 / V8 (4.2 s/attempt â within noise), Bun 1.3 / JavaScriptCore (9.8 s/attempt â **2.1Ã slower than V8** for BigInt-heavy M31 arithmetic). README Â§ Performance updated with a cross-engine table + per-engine expected solve times at floor difficulty.
 
 ### Still deferred
 
@@ -441,7 +441,7 @@ Closes 2 of 3 deferred risks from `[0.0.1]`. Risk 6 (pure-JS proof-shape live ro
 
 ### Test infrastructure changes
 
-- RPC suite tests now use `target_solve_time_s: 0.001 + min_solve_time_s: 0.001` (btxd's floor difficulty) instead of `target_solve_time_s: 1` — keeps CPU-only CPU-only solve under ~10 min for the test pause window. `expires_in_s: 120 → 1800` so the challenge doesn't expire during slow solves. Per-test timeout 360s → 1_200_000ms. Client timeout 300_000ms → 900_000ms with comment.
+- RPC suite tests now use `target_solve_time_s: 0.001 + min_solve_time_s: 0.001` (btxd's floor difficulty) instead of `target_solve_time_s: 1` â keeps CPU-only CPU-only solve under ~10 min for the test pause window. `expires_in_s: 120 â 1800` so the challenge doesn't expire during slow solves. Per-test timeout 360s â 1_200_000ms. Client timeout 300_000ms â 900_000ms with comment.
 
 ## [middleware-express 0.1.0] - 2026-05-22
 
@@ -460,65 +460,65 @@ First npm publish under `@btx-tools/challenges-sdk`. Foundation release: RPC cli
 ### Known limitations (deferred to 0.0.2)
 
 - **Live HTTP-loop integration tests** (`tests/integration/solve-redeem.test.ts`) are present and gated on `BTX_INTEGRATION_URL/AUTH/NODE_DEDICATED`, but have NOT been run end-to-end against a live dedicated btxd before this release. Algorithm correctness is instead validated via 5 byte-equal golden vectors lifted from btxd's own test suite (`tests/unit/matmul/btxd-vectors.test.ts`) + a live sigma cross-check against btx-node. HTTP + auth paths are exercised by 14 msw-mocked unit tests + the Day 1 smoke test. The live HTTP-loop run is queued for 0.0.2 once a dedicated non-mining btxd is provisioned.
-- **Proof-shape live roundtrip**: `SolverOutput.proof = { challenge, nonce64_hex, digest_hex }` is derived by reading btxd's `solvematmulservicechallenge` RPC handler. Structure is verified statically; live roundtrip (pure-JS solve → `client.redeem` → `valid: true`) closes alongside the integration test run.
+- **Proof-shape live roundtrip**: `SolverOutput.proof = { challenge, nonce64_hex, digest_hex }` is derived by reading btxd's `solvematmulservicechallenge` RPC handler. Structure is verified statically; live roundtrip (pure-JS solve â `client.redeem` â `valid: true`) closes alongside the integration test run.
 - **Pure-JS performance** is V8-specific (measured 4.6 s/attempt at n=512 on Node 22 / M-series Mac). Bun, Deno, Firefox, Safari untested.
 
 ### @btx-tools/challenges-sdk
 
-#### Day 2.5 Steps 11-13 — Day 2.5 close
+#### Day 2.5 Steps 11-13 â Day 2.5 close
 
-- **Integration tests** (`tests/integration/solve-redeem.test.ts`): added a parallel pure-JS suite alongside the existing RPC suite. Both stay triple-gated on `BTX_INTEGRATION_URL` + `BTX_INTEGRATION_AUTH` + `BTX_INTEGRATION_NODE_DEDICATED=1`. Pure-JS suite gets a 75-min timeout per test (n=512 at btxd's lowest difficulty ≈ 770 attempts × 4.6 s ≈ 1 hour expected).
-- **Perf bench** (`tests/perf/solver-bench.ts`): runnable via `npx tsx packages/core/tests/perf/solver-bench.ts [N]`. Walks the full canonical solve for N synthetic attempts at n=512 / b=16 / r=8 and reports mean/median/min/max. Day 2.5 baseline on M-series Mac / Node 22: **4.6 s/attempt** (mean over 5 samples, tight ±0.05 s spread).
-- **README**: updated `§ Solver` with a working pure-JS usage example (replaces the old "throws not_implemented" disclaimer), a § Algorithm correctness section listing the 5 byte-equal golden cross-checks, and a § Performance section with the bench numbers + per-difficulty wall-clock estimates. Roadmap now marks Day 2 + Day 2.5 ✅ and adds Day 2.6 (WASM port) as the next item.
+- **Integration tests** (`tests/integration/solve-redeem.test.ts`): added a parallel pure-JS suite alongside the existing RPC suite. Both stay triple-gated on `BTX_INTEGRATION_URL` + `BTX_INTEGRATION_AUTH` + `BTX_INTEGRATION_NODE_DEDICATED=1`. Pure-JS suite gets a 75-min timeout per test (n=512 at btxd's lowest difficulty â 770 attempts Ã 4.6 s â 1 hour expected).
+- **Perf bench** (`tests/perf/solver-bench.ts`): runnable via `npx tsx packages/core/tests/perf/solver-bench.ts [N]`. Walks the full canonical solve for N synthetic attempts at n=512 / b=16 / r=8 and reports mean/median/min/max. Day 2.5 baseline on M-series Mac / Node 22: **4.6 s/attempt** (mean over 5 samples, tight Â±0.05 s spread).
+- **README**: updated `Â§ Solver` with a working pure-JS usage example (replaces the old "throws not_implemented" disclaimer), a Â§ Algorithm correctness section listing the 5 byte-equal golden cross-checks, and a Â§ Performance section with the bench numbers + per-difficulty wall-clock estimates. Roadmap now marks Day 2 + Day 2.5 â and adds Day 2.6 (WASM port) as the next item.
 
-#### Day 2.5 Step 10 — cross-validation against btxd golden vectors (+ noise byte-order fix)
+#### Day 2.5 Step 10 â cross-validation against btxd golden vectors (+ noise byte-order fix)
 
 - Cross-validated the pure-JS solver against pinned golden vectors lifted from btxd's own test suite (`src/test/matmul_*_tests.cpp`):
   - `matrix.fromSeedRect(zero, 8)` first 3 elements match `matrix_from_seed_deterministic`
   - `deriveNoiseSeed(TAG_EL, zero_sigma)` matches `noise_derived_seed_pinned_EL`
   - `noise.generate(zero_sigma, 4, 2)` E_L + E_R matrices match `noise_EL_pinned_elements` / `noise_ER_pinned_elements`
   - `canonicalMatMul(A=FromSeed(seed_a,8), B=FromSeed(seed_b,8), b=4, sigma)` transcript_hash matches `canonical_matmul_n8_b4_pinned_transcript`
-- Plus a live sigma cross-check against btx-node's `verifymatmulserviceproof` for two nonces — byte-equal.
-- New test file: `packages/core/tests/unit/matmul/btxd-vectors.test.ts` (5 tests) — locks the cross-validation in CI so a future port change can't silently break it.
+- Plus a live sigma cross-check against btx-node's `verifymatmulserviceproof` for two nonces â byte-equal.
+- New test file: `packages/core/tests/unit/matmul/btxd-vectors.test.ts` (5 tests) â locks the cross-validation in CI so a future port change can't silently break it.
 
 ##### Fixed (algorithm correctness)
 
-- **Noise + compression seed byte-order**: `deriveNoiseSeed` (noise.ts) and `deriveCompressionSeed` (transcript.ts) were reversing the raw SHA-256 output before returning. Cause: btxd's C++ stores these uint256s via `CanonicalBytesToUint256` (reverse-storage), while `DeriveSigma` stores its uint256 direct — asymmetric storage that doesn't translate to a single "BE convention" in TS. `from_oracle`'s internal reverse-then-hash inverts each storage policy differently, so the bytes ACTUALLY HASHED end up: `REVERSE(raw_sigma)` for sigma, but `raw_noise` for noise/compression. The TS port was applying the same reverse to both. Fix: remove the reverse on the output of `deriveNoiseSeed` and `deriveCompressionSeed`; keep the reverse on `deriveSigma`. All 130 unit tests still green.
+- **Noise + compression seed byte-order**: `deriveNoiseSeed` (noise.ts) and `deriveCompressionSeed` (transcript.ts) were reversing the raw SHA-256 output before returning. Cause: btxd's C++ stores these uint256s via `CanonicalBytesToUint256` (reverse-storage), while `DeriveSigma` stores its uint256 direct â asymmetric storage that doesn't translate to a single "BE convention" in TS. `from_oracle`'s internal reverse-then-hash inverts each storage policy differently, so the bytes ACTUALLY HASHED end up: `REVERSE(raw_sigma)` for sigma, but `raw_noise` for noise/compression. The TS port was applying the same reverse to both. Fix: remove the reverse on the output of `deriveNoiseSeed` and `deriveCompressionSeed`; keep the reverse on `deriveSigma`. All 130 unit tests still green.
 - Without this fix, every noise matrix entry and every compression-vector element was wrong, producing digests btxd would reject. Caught by the cross-validation script before any external user noticed.
 
-#### Day 2.5 Steps 1-9 — pure-JS MatMul solver port (algorithm port complete; cross-validation pending)
+#### Day 2.5 Steps 1-9 â pure-JS MatMul solver port (algorithm port complete; cross-validation pending)
 
 - `Solver.solve(challenge, { mode: 'pure-js' })` now produces real proofs instead of throwing `not_implemented`. Browser-compatible, no btxd RPC required.
-- Port of the canonical CPU path from `btxd v0.29.7 src/matmul/` (`field`, `noise`, `transcript`, `matmul_pow` — NEON/CUDA acceleration paths intentionally out of scope):
-  - `src/matmul/constants.ts` — M31 modulus + 6 domain tags (4 noise, 2 transcript)
-  - `src/matmul/field.ts` — M31 arithmetic (`add/sub/mul/neg/inv/dot/fromOracle`). `mul` and `dot` accumulator use `BigInt` because the worst-case product 2^62 exceeds Number's 2^53 precision; a Number-only split-multiplication path is queued as a perf optimization
-  - `src/matmul/matrix.ts` — Matrix struct + `zeros/get/set/fromSeedRect/matAdd/matMul`
-  - `src/matmul/header.ts` — `serializeMatMulHeader/computeMatMulHeaderHash/deriveSigma` matching btxd's 150-byte LE wire format
-  - `src/matmul/noise.ts` — `deriveNoiseSeed/generate` → `NoisePair {E_L, E_R, F_L, F_R}`
-  - `src/matmul/transcript.ts` — `deriveCompressionVector/compressBlock/TranscriptHasher/canonicalMatMul` (block-wise n×n product with SHA-256d transcript binding)
-  - `src/matmul/pow.ts` — top-level `solveJs(challenge, options)` nonce search loop with `bigint` 256-bit target comparison
+- Port of the canonical CPU path from `btxd v0.29.7 src/matmul/` (`field`, `noise`, `transcript`, `matmul_pow` â NEON/CUDA acceleration paths intentionally out of scope):
+  - `src/matmul/constants.ts` â M31 modulus + 6 domain tags (4 noise, 2 transcript)
+  - `src/matmul/field.ts` â M31 arithmetic (`add/sub/mul/neg/inv/dot/fromOracle`). `mul` and `dot` accumulator use `BigInt` because the worst-case product 2^62 exceeds Number's 2^53 precision; a Number-only split-multiplication path is queued as a perf optimization
+  - `src/matmul/matrix.ts` â Matrix struct + `zeros/get/set/fromSeedRect/matAdd/matMul`
+  - `src/matmul/header.ts` â `serializeMatMulHeader/computeMatMulHeaderHash/deriveSigma` matching btxd's 150-byte LE wire format
+  - `src/matmul/noise.ts` â `deriveNoiseSeed/generate` â `NoisePair {E_L, E_R, F_L, F_R}`
+  - `src/matmul/transcript.ts` â `deriveCompressionVector/compressBlock/TranscriptHasher/canonicalMatMul` (block-wise nÃn product with SHA-256d transcript binding)
+  - `src/matmul/pow.ts` â top-level `solveJs(challenge, options)` nonce search loop with `bigint` 256-bit target comparison
 - `SolverOptions.pureJs?: SolveJsOptions` forwards `{ maxTries, nonceStart, onAttempt, attemptInterval }` to the pure-JS solver
 - `SolverOutput.proof` populated with the same shape btxd's solve RPC returns: `{ challenge, nonce64_hex, digest_hex }`
 - Adds `@noble/hashes ^2.2.0` runtime dep (~25 KB, zero sub-deps, audited)
 - 100 new unit tests for the matmul submodules (field 22, header 14, matrix 13, noise 11, transcript 21, pow 15, constants 4). Existing solver dispatch tests updated for the new pure-js behavior; RPC tests untouched
-- Build size delta: ESM 7.84 KB → 22.65 KB (well under the +30 KB budget)
+- Build size delta: ESM 7.84 KB â 22.65 KB (well under the +30 KB budget)
 
-**Internal correctness verified**: `canonicalMatMul`'s C' matches naive `matMul` on 4×4 / 8×8 cases; SHA-256d transcript is deterministic across instances; field invariants hold (a·inv(a)=1, MAX²=1, oracle determinism). **Cross-validation against btxd's actual digests still pending** — requires fixtures captured from a dedicated non-mining btxd. Until that lands, `Solver.solve({ mode: 'pure-js' })` outputs may or may not redeem against a live btxd. Documented as a known constraint in the SDK; the gate is Day 2.5 Step 10.
+**Internal correctness verified**: `canonicalMatMul`'s C' matches naive `matMul` on 4Ã4 / 8Ã8 cases; SHA-256d transcript is deterministic across instances; field invariants hold (aÂ·inv(a)=1, MAXÂ²=1, oracle determinism). **Cross-validation against btxd's actual digests still pending** â requires fixtures captured from a dedicated non-mining btxd. Until that lands, `Solver.solve({ mode: 'pure-js' })` outputs may or may not redeem against a live btxd. Documented as a known constraint in the SDK; the gate is Day 2.5 Step 10.
 
 **Out of scope** (queued for Day 2.6+): WASM port of the matmul kernel, Web Worker parallel nonce search, replay/product-committed digest helpers (verifier optimizations), perf bench against M-series Mac.
 
-#### Day 2 — Solver class (RPC mode)
+#### Day 2 â Solver class (RPC mode)
 
 - `Solver` class with mode dispatch (`'rpc' | 'pure-js' | 'auto'`)
-  - **`mode: 'rpc'`** — delegates to `BtxChallengeClient.solve()` → btxd's `solvematmulservicechallenge`. **Server-side / Node only.** Ships v0.0.1.
-  - **`mode: 'pure-js'`** — placeholder; throws `not_implemented` with pointer to Day 2.5 work.
-  - **`mode: 'auto'`** (default) — picks `'rpc'` if `opts.rpcClient` provided, else `'pure-js'`.
+  - **`mode: 'rpc'`** â delegates to `BtxChallengeClient.solve()` â btxd's `solvematmulservicechallenge`. **Server-side / Node only.** Ships v0.0.1.
+  - **`mode: 'pure-js'`** â placeholder; throws `not_implemented` with pointer to Day 2.5 work.
+  - **`mode: 'auto'`** (default) â picks `'rpc'` if `opts.rpcClient` provided, else `'pure-js'`.
 - 10 unit tests cover dispatch (rpc / pure-js / auto), error propagation, default mode behavior
-- Integration test for full `issue → Solver.solve(rpc) → redeem` lifecycle — **gated on `BTX_INTEGRATION_NODE_DEDICATED=1`** (see "deployment note" below)
+- Integration test for full `issue â Solver.solve(rpc) â redeem` lifecycle â **gated on `BTX_INTEGRATION_NODE_DEDICATED=1`** (see "deployment note" below)
 
 #### Day 2 deployment finding
 
-btxd's `solvematmulservicechallenge` RPC shares matmul backend with block mining. On any mining-loaded node (mining-loaded nodes), the solve RPC takes 15+ minutes — direct SSH-piped measurement on btx-node 2026-05-20 ran 900s before btx-cli's own transient-error timeout fired. Solver users MUST point at a dedicated non-mining btxd (e.g., $5/mo DO droplet with `gen=0`). Documented in README. Day 2.5 pure-JS solver removes this constraint for browser clients.
+btxd's `solvematmulservicechallenge` RPC shares matmul backend with block mining. On any mining-loaded node (mining-loaded nodes), the solve RPC takes 15+ minutes â direct SSH-piped measurement on btx-node 2026-05-20 ran 900s before btx-cli's own transient-error timeout fired. Solver users MUST point at a dedicated non-mining btxd (e.g., $5/mo DO droplet with `gen=0`). Documented in README. Day 2.5 pure-JS solver removes this constraint for browser clients.
 
 #### Added (Day 1 + Wave A/B/C)
 
@@ -531,7 +531,7 @@ btxd's `solvematmulservicechallenge` RPC shares matmul backend with block mining
 - Unit tests (msw-mocked HTTP) + integration tests (SSH-to-btxd)
 - GitHub Actions CI matrix: Node 18 / 20 / 22
 
-#### Fixed (Day 1 audit findings — addressed all C/H/M-severity items except M4)
+#### Fixed (Day 1 audit findings â addressed all C/H/M-severity items except M4)
 
 - **C1**: replaced `btoa()` with universal `Buffer.from(..., 'utf8').toString('base64')` path; non-ASCII rpcauth credentials no longer crash on every call
 - **C2**: added unit-test layer that actually exercises `BtxChallengeClient` (Day 1 only tested btxd-via-SSH, coverage of shipped code was 0%)
@@ -540,20 +540,20 @@ btxd's `solvematmulservicechallenge` RPC shares matmul backend with block mining
 - **H3**: `res.json()` parse failures normalized to `BtxParseError`
 - **H4**: fetch timeout/network errors normalized to `BtxTimeoutError` / `BtxNetworkError`
 - **H5**: code comment explaining JSON-RPC `"1.0"` is correct for Bitcoin-family btxd (not `"2.0"` as Ethereum-style)
-- **M1**: `Challenge` envelope properly typed (binding, proof_policy, challenge sub-shapes) — needed for Day 2 solver
-- **M2**: batch RPCs guard `entries.length` to spec-required 1–256
-- **M3**: `IssueParams` no longer hard-codes btxd defaults — unset params are omitted from the call so btxd's own defaults apply (positional args truncated at last set)
+- **M1**: `Challenge` envelope properly typed (binding, proof_policy, challenge sub-shapes) â needed for Day 2 solver
+- **M2**: batch RPCs guard `entries.length` to spec-required 1â256
+- **M3**: `IssueParams` no longer hard-codes btxd defaults â unset params are omitted from the call so btxd's own defaults apply (positional args truncated at last set)
 - **M5**: README + JSDoc add HTTPS deployment guidance
 - **M6**: request IDs use `crypto.randomUUID()` instead of process-local `++counter`
 - **M7**: `Solver` export stub added (closes spec drift; Day 2 implements)
 
 #### Deferred
 
-- **M4** (functional companion for tree-shaking) → v0.1 work
+- **M4** (functional companion for tree-shaking) â v0.1 work
 
 ### @btx-tools/mcp-gateway
 
-- Scaffold only (Day 1) — real implementation Day 5-6
+- Scaffold only (Day 1) â real implementation Day 5-6
 
 ---
 

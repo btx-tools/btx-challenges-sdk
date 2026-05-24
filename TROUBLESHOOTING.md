@@ -1,6 +1,6 @@
 # `@btx-tools/challenges-sdk` — troubleshooting cookbook
 
-> **Format**: flat list of symptom → fix. Find your error message, jump to the fix. Each entry has an anchor ID (the heading slug) so external docs (like `QUICKSTART.md`) can deep-link.
+> **Format**: flat list of symptom → fix. Find your error message, jump to the fix. Each entry has an anchor ID (the heading slug) so external docs can deep-link.
 >
 > **Scope**: `@btx-tools/challenges-sdk@0.0.3` + `@btx-tools/middleware-express@0.2.0` (current). When a fix retires (audit item closes in a future version), the entry is amended in place with a "Resolved in X.Y" note rather than deleted, so old StackOverflow links still resolve.
 
@@ -283,9 +283,9 @@ See `examples/02-express-gate/src/server.ts` for a working config + the [middlew
 
 ## See also
 
-- [`QUICKSTART.md`](./QUICKSTART.md) — 30-min onboarding with these entries called out in each phase's Known-issues block
 - [`packages/core/README.md`](./packages/core/README.md) — full API reference
-- Open audit findings (will retire matching cookbook entries when closed): see `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`
+- [`examples/`](./examples) — runnable end-to-end integrations (basic roundtrip, Express gate, browser solver, browser miner)
+- Open audit findings (will retire matching cookbook entries when closed): see internal audit notes
 - GitHub issues: https://github.com/btx-tools/btx-challenges-sdk/issues
 
 ## Status of open audit items (entries that will retire)

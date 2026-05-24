@@ -4,7 +4,9 @@
 
 A TypeScript SDK for **[BTX](https://btx.dev) service challenges**: your server asks a caller to burn a few seconds of _verifiable_ compute before you do something expensive or abusable. The work is defined and checked by the BTX chain — so there's no centralized issuer to trust, and a proof can't be replayed. Ships a typed RPC client, a solver, and **one-line middleware for Express, Fastify, and Hono**.
 
-📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** · 🟢 **Stable `1.0.0`** ([SemVer](https://semver.org/) — breaking changes require `2.0.0`) · MIT
+📖 **[API Reference](https://btx-tools.github.io/btx-challenges-sdk/)** · 🟢 **Stable — `1.4.0`** ([SemVer](https://semver.org/); the `1.0.0` server-side API is frozen — breaking changes require `2.0.0`) · MIT
+
+> _`@btx-tools` is an independent, community-built toolkit for [BTX](https://btx.dev) — not an official BTX-core project. Built on the public chain, coordinated with the core team._
 
 ## What is this?
 
@@ -71,7 +73,7 @@ app.post(
 
 ## Packages
 
-This repo is a monorepo: the core SDK plus three framework adapters (install only the ones you need).
+This repo is a monorepo: the core SDK, three framework adapters, a WebGPU solver kernel, and a browser miner (install only the ones you need).
 
 | Package                                                          | Description                                                          | npm                                                                                                                               |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -79,6 +81,8 @@ This repo is a monorepo: the core SDK plus three framework adapters (install onl
 | [`@btx-tools/middleware-express`](./packages/middleware-express) | Express middleware adapter                                           | [![npm](https://img.shields.io/npm/v/@btx-tools/middleware-express)](https://www.npmjs.com/package/@btx-tools/middleware-express) |
 | [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter                                               | [![npm](https://img.shields.io/npm/v/@btx-tools/middleware-fastify)](https://www.npmjs.com/package/@btx-tools/middleware-fastify) |
 | [`@btx-tools/middleware-hono`](./packages/middleware-hono)       | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | [![npm](https://img.shields.io/npm/v/@btx-tools/middleware-hono)](https://www.npmjs.com/package/@btx-tools/middleware-hono)       |
+| [`@btx-tools/matmul-webgpu`](./packages/matmul-webgpu)           | **WebGPU matmul solver kernel** — GPU-accelerated, byte-exact, **~50× the WASM matmul** per attempt; powers `Solver` `mode: 'webgpu'`. New (`0.x`). | [![npm](https://img.shields.io/npm/v/@btx-tools/matmul-webgpu)](https://www.npmjs.com/package/@btx-tools/matmul-webgpu)         |
+| [`@btx-tools/browser-miner`](./packages/browser-miner)           | **Pool-agnostic browser mining client** (WebGPU→WASM→JS solver cascade, vardiff, throttle). Demo/foundation — **not a money-maker**. New (`0.x`). | [![npm](https://img.shields.io/npm/v/@btx-tools/browser-miner)](https://www.npmjs.com/package/@btx-tools/browser-miner)         |
 
 ### Sibling packages (separate repos)
 
@@ -86,6 +90,8 @@ This repo is a monorepo: the core SDK plus three framework adapters (install onl
 | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | [`@btx-tools/mcp-gateway`](https://www.npmjs.com/package/@btx-tools/mcp-gateway) | **MCP server framework** that gates every tool invocation behind a BTX service-challenge proof — for agentic AI admission control. Companion to this SDK. | [btx-tools/btx-mcp-gateway](https://github.com/btx-tools/btx-mcp-gateway) |
 | [`@btx-tools/matmul-wasm`](https://www.npmjs.com/package/@btx-tools/matmul-wasm) | **WASM matmul solver kernel** — byte-exact Rust→WASM port of btxd's matmul PoW. Optional dep of the core SDK; powers `Solver` `mode: 'wasm'` (~24× pure-JS). Fast server/edge solving without a btxd. | [btx-tools/btx-challenges-wasm](https://github.com/btx-tools/btx-challenges-wasm) |
+
+> **Maturity:** the core SDK + middleware are `1.x` (stable, frozen API). `matmul-webgpu` and `browser-miner` are new `0.x` packages — functional and audited, but their APIs may still evolve.
 
 ### Post-1.0 roadmap
 
@@ -126,7 +132,7 @@ Then see the per-package README:
 
 ## What this SDK is (and isn't)
 
-> **Read [USE-CASES.md](./USE-CASES.md) before deciding to integrate.** This SDK is **server-side admission middleware** for chain-anchored proof-of-work gating. It is **not** a casual browser captcha library — even the optional `@btx-tools/matmul-wasm` kernel (~24× the pure-JS solver) leaves a floor-difficulty browser solve at ~16 s on an 8-worker pool at the live `n=512`, not the 1–4 s a click-to-admit widget needs. Use `mode: 'rpc'` against a dedicated non-mining btxd for production gating, or `mode: 'wasm'` for fast no-node solving (server/edge, CLI, high-friction gates).
+> **Read [USE-CASES.md](./USE-CASES.md) before deciding to integrate.** This SDK is **server-side admission middleware** for chain-anchored proof-of-work gating. For production gating, solve with `mode: 'rpc'` against a dedicated non-mining btxd, or `mode: 'wasm'` for fast no-node solving (server/edge, CLI, high-friction gates). Browser solving is improving fast — the new `mode: 'webgpu'` kernel ([`@btx-tools/matmul-webgpu`](https://www.npmjs.com/package/@btx-tools/matmul-webgpu)) is **~50× the WASM matmul per attempt** — but a sub-second casual per-request captcha at the live `n=512` is **not yet end-to-end benchmarked**. Until it is, treat browser use as one-shot / high-friction admission, not a click-to-admit widget.
 
 ## Examples
 

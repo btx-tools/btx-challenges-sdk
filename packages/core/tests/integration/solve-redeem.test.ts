@@ -9,9 +9,9 @@
  *   BTX_INTEGRATION_NODE_DEDICATED   — "1" (must be a NOT-MINING btxd)
  *
  * Why the third gate (NODE_DEDICATED): btxd's service-challenge solver shares
- * the matmul backend with block-template mining. On a mining-loaded node like
- * any of mining-loaded nodes, `solvematmulservicechallenge` queues behind
- * block work and takes minutes-to-hours. For the pure-JS suite the gate is
+ * the matmul backend with block-template mining. On any mining-loaded node,
+ * `solvematmulservicechallenge` queues behind block work and takes
+ * minutes-to-hours. For the pure-JS suite the gate is
  * less critical (we don't touch the solve RPC) but it still applies because
  * `verifymatmulserviceproof` does full transcript recomputation under load.
  *

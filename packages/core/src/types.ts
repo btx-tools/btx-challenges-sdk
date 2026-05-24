@@ -210,7 +210,7 @@ export interface SolverOutput {
  * Exponential backoff: delay between attempt N and N+1 is
  * `baseDelayMs * 2^(N-1)`. With `jitter: true`, adds `random(0, baseDelayMs)`.
  *
- * Audit ref: D-3 in `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`.
+ * Audit ref: D-3 in internal audit notes.
  */
 export interface RetryOptions {
   /**
@@ -247,7 +247,7 @@ export interface RetryOptions {
    * cheap and non-throwing: an exception thrown inside `onRetry` propagates out
    * of the client call.
    *
-   * Audit ref: L-3 in `BTX/audits/btx-challenges-sdk-audit-2026-05-23.md`.
+   * Audit ref: L-3 in internal audit notes.
    */
   onRetry?: (attempt: number, error: unknown, nextDelayMs: number) => void;
 }
@@ -333,14 +333,14 @@ export interface BtxClientOpts {
    * (or the raw `{ solvematmulservicechallenge: 1_000_000 }`) to give the solver
    * a long runway without bloating the client-wide default.
    *
-   * Audit ref: D-4 in `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`;
+   * Audit ref: D-4 in internal audit notes;
    * semantic shortcuts L-4 in `…-audit-2026-05-23.md`.
    */
   methodTimeouts?: Record<string, number>;
   /**
    * Retry policy. Default `{ max: 0 }` (off). See {@link RetryOptions}.
    *
-   * Audit ref: D-3 in `BTX/audits/btx-challenges-sdk-audit-2026-05-22.md`.
+   * Audit ref: D-3 in internal audit notes.
    */
   retry?: RetryOptions;
 }

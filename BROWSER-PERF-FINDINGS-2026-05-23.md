@@ -1,144 +1,54 @@
-# Browser pure-JS solver perf — findings + WASM decision
+# Browser solver performance
 
-> **Date**: 2026-05-23 (significantly updated post-spike same day)
-> **Author**: SDK development
-> **Scope**: measure pure-JS solver wall-clock + measure WASM speedup via a Rust spike, decide whether browser captcha at 1-4s admission UX is achievable.
+> How fast a BTX service-challenge can be solved in a browser, and what that means for where this
+> SDK fits. **Short version:** with the CPU/WASM solver, an in-browser solve at the live `n=512`
+> difficulty is seconds-to-minutes (difficulty-dependent) — great for server-side gating and
+> high-friction one-shot flows, not for a sub-second per-request captcha widget. The new WebGPU
+> kernel changes this materially (below).
 
-> **Update (2026-05-24): the WASM kernel shipped** as [`@btx-tools/matmul-wasm`](https://www.npmjs.com/package/@btx-tools/matmul-wasm), wired into the SDK as `Solver` `mode: 'wasm'` (~24× pure-JS, byte-identical proof). **The decision below stands** — still not a casual 1–4 s browser captcha (full in-browser measurement: ~16 s floor on an 8-worker pool; 128 ms/attempt V8 · 165 ms Firefox at the live `n=512`; SIMD doesn't close it). What changed is positioning: the kernel is shipped as **the fastest no-node solver** (server/edge/CLI) and for **high-friction one-shot gates**, not shelved. Full measurement: `internal notes`.
+## CPU / WASM
 
-## TL;DR — REVISED post-spike
-
-**Decision: a CASUAL BROWSER CAPTCHA AT 1-4s IS NOT VIABLE with the current BTX matmul proof primitive.** No combination of WASM + SIMD + multi-worker parallelism closes the ~100× browser-vs-native gap to the 1-4s UX budget at btx.dev's recommended production difficulty.
-
-The SDK ships **server-side admission middleware** as the production path, plus the optional `@btx-tools/matmul-wasm` kernel (`mode: 'wasm'`) as the fastest no-node solver. Pure-JS Solver is reference-only for one-shot scripts, CI fixtures, and demonstrating the wire protocol. See [`USE-CASES.md`](./USE-CASES.md) for the recommendation table.
-
-Browser captcha may become viable if the BTX team adds a browser-friendly proof primitive (Argon2-style memory-hard, smaller-n matmul variant, VDF) — that's an upstream protocol change tracked separately.
-
-### Spike receipts (Node 22 on M-series Mac)
-
-Crate at `~/code/btx-challenges-wasm/`, build via `wasm-pack build --target nodejs --release`.
+The matmul proof is dominated by M31 field multiplication. Measured speedups, pure-JS (BigInt) →
+WASM (Rust + i32), cross-validated byte-equal on 20 random mul pairs + 5 length-512 dot arrays:
 
 | Bench | Pure-JS BigInt | WASM (Rust + i32) | Speedup |
 |---|---|---|---|
 | `M31::mul` (isolated) | 14.7 Mops/s | 417 Mops/s | **28.4×** |
-| `M31::dot(len=512)` (the actual hot loop) | 35.8 Mops/s | 879 Mops/s | **24.5×** |
+| `M31::dot(len=512)` (the hot loop) | 35.8 Mops/s | 879 Mops/s | **24.5×** |
 
-Cross-validated byte-equal vs pure-JS on 20 random mul pairs + 5 dot arrays of length 512.
+**Per-attempt wall-clock at the live `n=512`:** ~128 ms (V8) / ~165 ms (Firefox) with the WASM
+kernel; ~5 s with pure-JS. A full solve searches many nonces (geometric distribution): at BTX
+**floor difficulty** a WASM 8-worker browser pool lands ~16 s; at **production difficulty**
+(`target_solve_time_s = 1.0`) it is hours-class — far beyond a 1–4 s widget budget. Pure-JS at floor
+is ~7 min–2 hr.
 
-### Projected full-WASM browser solve at production difficulty
+**Verdict (CPU/WASM):** excellent for **no-node solving** (server / edge / CLI) and **high-friction
+one-shot gates** (signup, KYC-alternative, agent registration); **not** a casual per-request browser
+captcha at production difficulty. For production gating, solve server-side via `mode: 'rpc'` against a
+dedicated non-mining btxd (sub-second).
 
-| Stack | Wall-clock at `target_solve_time_s=1.0` |
+## WebGPU (new)
+
+`@btx-tools/matmul-webgpu@0.1.0` (`Solver` `mode: 'webgpu'`) runs the matmul on the GPU and is
+**~50× the WASM matmul per attempt** (~2.6 ms at `n=512` on a discrete/Metal GPU vs ~128 ms WASM); at
+devnet `n=64` an attempt is sub-millisecond-class. A full in-browser solve is correspondingly faster
+than the WASM numbers above. An end-to-end browser wall-clock at the live `n=512` is being
+benchmarked — until that lands we don't claim a specific casual-captcha-grade number. This is the path
+toward a viable browser-side gate; see [`USE-CASES.md`](./USE-CASES.md) for the current recommendation.
+
+## Where the SDK fits today
+
+| Use case | Recommended approach |
 |---|---|
-| Pure-JS (today) | ~32 days |
-| Full WASM kernel | ~32 hours |
-| + SIMD128 (proj. 2-4×) | ~8 hours |
-| + 8 parallel Web Workers | ~1 hour |
+| Server-side admission gate | `mode: 'rpc'` against a dedicated non-mining btxd. Sub-second. |
+| No-node solving (server / edge / CLI) | `mode: 'wasm'` (~24× pure-JS), byte-identical proof. |
+| Browser one-shot / high-friction gate | `mode: 'wasm'` (or `'webgpu'`) in a Web Worker. Seconds — deliberate friction. |
+| Browser per-request widget, production difficulty | Not with WASM. WebGPU under evaluation. Until then, solve server-side or hold a per-session challenge behind a proxy. |
+| Test fixture / CI | `mode: 'pure-js'` — reference path, byte-equal to btxd's golden vectors. |
 
-**Even the most optimistic stack lands ~1000× over the 1-4s budget.** No incremental engineering closes that gap.
-
-## What we measured
-
-### Node baseline (canonical)
-
-| Source | Mode | Floor difficulty | Per-attempt wall-clock | Attempts to first valid proof |
-|---|---|---|---|---|
-| `packages/core/tests/integration/solve-redeem.test.ts` (2026-05-22 against btx-node, paused mining) | `pure-js` | `target_solve_time_s=0.001 + min_solve_time_s=0.001` | ~5 s (M-series Mac, Node 22) | 1 (lucky on first nonce — fastest case) |
-| Memory `project_btx_challenges_sdk_shipped_2026_05_22` § B-3 closure | `pure-js` | same | n/a | total 421 s (~7 min) to find a proof |
-| Phase 3 example 01 (this session, against btx-node via SSH tunnel) | `pure-js` | same | _measured in this session — see Appendix A_ | _≈_ |
-
-### Browser (deferred this session)
-
-Browser measurement was scoped for this session but not executed. The session has no Playwright MCP available, and headless-Chrome scripting via plain CLI would be ~30 min of incremental work for a single data point that won't change the WASM decision (see _Why the decision is robust_ below). Recommended follow-up: run `examples/03-browser-solver` in Chrome + Safari with `cycles=3`, drop the timing table into _Appendix B_ of this doc, ship as a small follow-up commit.
-
-Concrete steps for that follow-up (10 min):
-
-```bash
-# Terminal A — gate
-cd ~/code/btx-challenges-sdk/examples/02-express-gate
-set -a && source /tmp/btx-sdk-example/env && set +a
-pnpm start:server
-
-# Terminal B — Vite dev
-cd ~/code/btx-challenges-sdk/examples/03-browser-solver
-pnpm dev
-
-# Browser: open http://localhost:5173, set cycles=3, click "Run cycles"
-# Wait ~25-30 min for 3 cycles to complete
-# Copy the timing table into Appendix B below
-```
-
-## Why the decision is robust (without the browser number)
-
-WASM-vs-defer hinges on the gap between pure-JS and WASM, not on the precise pure-JS number. Three reasons the browser number can be off by 2× in either direction without changing the call:
-
-1. **Pure-JS is BigInt-bound, not memory-bound.** The matmul kernel spends ~95 % of its time in M31 multiplication via `BigInt`. V8 / JavaScriptCore both JIT BigInt arithmetic reasonably; per-engine deltas are usually <2× (cross-engine bench in `CHANGELOG.md` [0.0.2]: Node 4.6 s, Deno 4.2 s, Bun 9.8 s/attempt). Web Worker isolates don't degrade JIT quality.
-2. **WASM speedup is ~10-20× even at a conservative estimate.** btxd's native C++ on the same M-series CPU does a single attempt in ~50 ms (per memory `feedback_generateblock_failure_baseline` baseline ranges, scaled to single-attempt). WASM via a wasm-pack port of the matmul kernel would land somewhere between native (50 ms) and pure-JS (5 s) — call it 200-500 ms/attempt, giving 10-25× speedup over pure-JS.
-3. **The 1.0.0 API freeze is orthogonal.** Adding a WASM solver later is purely additive: `Solver.solve(challenge, { mode: 'wasm' })` slots into the existing `SolverMode` union. No API changes required to bolt it on as a non-breaking 0.3.x or 1.1.x release.
-
-Together: even if browser pure-JS turns out to be 2× slower than Node (worst plausible case → ~14 min/attempt at floor difficulty), the WASM benefit (drop to 30-45 s) is still material — but for use cases that warrant 7-14 min today, an extra 6 weeks of waiting for WASM is a tractable trade-off vs slipping 1.0.0.
-
-## Adopter implications shipped in 1.0.0
-
-These are documented across the example READMEs and TROUBLESHOOTING.md so adopters arrive informed:
-
-| Use case | Recommended approach in 1.0.0 |
-|---|---|
-| Server-side Node admission gate | `mode: 'rpc'` against a **dedicated non-mining btxd** (`gen=0`). Sub-second solves. The `mode: 'pure-js'` fallback exists but is slow. |
-| Server-side Node + only a mining-loaded btxd | `mode: 'pure-js'`. Tolerate 7-10 min per attempt. Pick `target_solve_time_s` to match your budget. |
-| Browser admission gate, one-shot form submission | `mode: 'pure-js'` in a Web Worker. Tolerate 7-10 min — fine for high-friction admission (KYC form, account creation). |
-| Browser admission gate, per-request API gating | **Don't.** Use a server-side proxy that holds a fresh challenge per session, or wait for the WASM kernel. |
-| Edge runtime (Cloudflare Workers, Vercel Edge) | `mode: 'pure-js'` works in principle but edge runtimes have strict CPU-time caps (Cloudflare: 50 ms CPU on free tier). Most adopters will need a non-edge backend for solving. |
-
-## Path to a WASM kernel (if/when shipped)
-
-Tracked as a future SDK roadmap row, not a 1.0.0 blocker:
-
-- **Effort**: ~1-2 weeks (port `packages/core/src/matmul/*.ts` to Rust → wasm-pack → publish as `@btx-tools/matmul-wasm` subpackage that the core consumes when present)
-- **Stack**: rustc + wasm-pack per `<internal config> § Rust / WASM crypto work` (already wired for the OTC Phase 1 work). Reuse `<internal>/` as a template.
-- **API surface**: `Solver.solve(challenge, { mode: 'wasm' })`. Same return shape. New optional subpackage in the core; pure-JS stays the fallback.
-- **Trigger**: ship if (a) browser adopters surface the need on GitHub issues OR (b) operator decides to lead with browser admission as an OTC funnel onramp. Until then, defer.
-
-## Appendix A — development live measurements
-
-| Metric | Value |
-|---|---|
-| Date | 2026-05-23 |
-| Hardware | M-series Mac (host) |
-| Node | 22 (via tsx 4.22) |
-| Target btxd | btx-node (`/BTX:0.30.1/`, tip 108698), via SSH tunnel on 127.0.0.1:19340 |
-| Challenge difficulty | `target_solve_time_s=0.001 + min_solve_time_s=0.001` (BTX floor) |
-| `client.issue()` wall-clock | **0.56 s** (example 01) / **0.58 s** (example 02 client → 402 round-trip) |
-| Vite dev server cold start | **192 ms** (example 03) |
-| Web Worker + SDK module graph resolution | ✅ verified (SDK pre-bundled to `node_modules/.vite/deps/`, worker imports `Solver` from `@btx-tools/challenges-sdk` via `/@fs/` path) |
-| Pure-JS solve wall-clock | **Not measured to completion this session** — two parallel pure-JS runs reached 20+ min CPU-bound (both processes at 98% CPU, real work, not wedged) without completing. Killed before completion. Honest reality: at floor difficulty, 770 expected attempts × 5 s/attempt ≈ **~1 hr mean wall-clock**, geometric distribution (observed range 7 min to 2 hr per integration-test docstring). |
-| RPC mode against dedicated btxd | **Not measured this session** — node is mining-loaded; using `mode: 'rpc'` against it would queue 15+ min behind block work. Briefly pausing node mining via the canonical `node-control` + `node-control` tools is the recommended follow-up if a fresh RPC-mode number is wanted. Established baseline from `[0.0.4]` CHANGELOG: ~3 s solve on a dedicated non-mining btxd. |
-
-### What this session actually verified
-
-Even without completing a pure-JS solve, the examples are demonstrably wired end-to-end:
-
-1. `pnpm install` resolves all 8 workspaces; SDK packages symlink into example workspaces
-2. `pnpm -r type-check` exits 0 (all 7 type-check-enabled workspaces)
-3. `pnpm -r build` exits 0 (3 SDK packages + 3 example packages with build steps)
-4. `pnpm -r test` exits 0 — **201 unit + 2 perf tests pass**, no regression
-5. Example 01 reaches `client.issue()` against a live btxd, gets a real challenge envelope (`challenge_id=59ba3353425adcd0...`), starts pure-JS solving (CPU pinned, real BigInt matmul work)
-6. Example 02 server boots on `:3000`, serves the routes JSON on `GET /`, responds with 402 + a real challenge envelope on a no-proof POST
-7. Example 02 client reaches the 402 + extracts the challenge from `X-BTX-Challenge` header in 0.58 s, hands off to Solver
-8. Example 03 Vite dev server cold-starts in 192 ms; HMR + Web Worker module + SDK pre-bundling all confirmed live via direct curl probes
-
-The pure-JS wall-clock that didn't complete is a property of the SDK + chain economics, not the example code.
-
-## Appendix B — Browser measurement (deferred)
-
-To be appended in a follow-up. Expected schema:
-
-| Browser | Cycle | 402 (ms) | solve (ms) | 200 (ms) | total (ms) | status |
-|---|---|---|---|---|---|---|
-| _Chrome 132_ | 1 | _x_ | _y_ | _z_ | _x+y+z_ | _200_ |
-| _Chrome 132_ | 2 | _x_ | _y_ | _z_ | _x+y+z_ | _200_ |
-| _Chrome 132_ | 3 | _x_ | _y_ | _z_ | _x+y+z_ | _200_ |
-| _Safari 18_ | 1 | _x_ | _y_ | _z_ | _x+y+z_ | _200_ |
-| _Safari 18_ | 2 | _x_ | _y_ | _z_ | _x+y+z_ | _200_ |
-| _Safari 18_ | 3 | _x_ | _y_ | _z_ | _x+y+z_ | _200_ |
-
-If browser p50 ≥ 2× Node baseline: revisit the WASM-defer call and reopen a Phase 3.5 slot.
+> **Why the proof is heavy in a browser:** the matmul primitive at `n=512` is BigInt-class arithmetic
+> tuned for native (NEON/CUDA) mining throughput. WASM closes a chunk of the native gap (~24×) and
+> WebGPU much more (~50× on the matmul), but the design target is verifiable *work*, so a browser
+> solve is intentionally non-trivial. A casual sub-second widget at production difficulty would need a
+> browser-friendly proof primitive at the protocol level (e.g. memory-hard or a smaller-`n` variant) —
+> tracked upstream, independent of this SDK.

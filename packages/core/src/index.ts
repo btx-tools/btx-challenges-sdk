@@ -4,7 +4,8 @@
  * TypeScript SDK for BTX service challenges — chain-anchored proof-of-work
  * admission control for APIs, agent gateways, and form submissions.
  *
- * Built against btxd v0.29.7+. RPC reference: https://btx.dev/docs/rpc/service-challenges
+ * Matmul algorithm ported from btxd v0.29.7 src/matmul; the service-challenge
+ * RPCs require a btxd running v0.30.1+. RPC reference: https://btx.dev/docs/rpc/service-challenges
  */
 
 export { BtxChallengeClient } from './client.js';
