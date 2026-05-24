@@ -110,6 +110,27 @@ importers:
         specifier: ^0.1.0
         version: 0.1.1
 
+  packages/matmul-webgpu:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.19
+      '@webgpu/types':
+        specifier: ^0.1.40
+        version: 0.1.70
+      prettier:
+        specifier: ^3.3.0
+        version: 3.8.3
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(postcss@8.5.15)(tsx@4.22.3)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.19)(msw@2.14.6(@types/node@22.19.19)(typescript@5.9.3))
+
   packages/middleware-express:
     devDependencies:
       '@btx-tools/challenges-sdk':
@@ -993,6 +1014,9 @@ packages:
 
   '@vitest/utils@2.1.9':
     resolution: {integrity: sha512-v0psaMSkNJ3A2NMrUEHFRzJtDPFn+/VWZ5WxImB21T9fjucJRmS7xCS3ppEnARb9y11OAzaD+P2Ps+b+BGX5iQ==}
+
+  '@webgpu/types@0.1.70':
+    resolution: {integrity: sha512-LFiNHHKMvmAEvwVew3JLJmTdShhbdwRFSImUshGhE2mGE8ybQzIo63l5uRp+YKnNx+8Qno8Kf6gN+DKMreIJCA==}
 
   abstract-logging@2.0.1:
     resolution: {integrity: sha512-2BjRTZxTPvheOvGbBslFSYOUkr+SjPtOnrLP33f+VIWLzezQpZcqVg7ja3L4dBXmzzgwT+a029jRx5PCi3JuiA==}
@@ -2560,6 +2584,8 @@ snapshots:
       '@vitest/pretty-format': 2.1.9
       loupe: 3.2.1
       tinyrainbow: 1.2.0
+
+  '@webgpu/types@0.1.70': {}
 
   abstract-logging@2.0.1: {}
 

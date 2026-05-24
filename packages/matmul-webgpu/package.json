@@ -1,0 +1,72 @@
+{
+  "name": "@btx-tools/matmul-webgpu",
+  "version": "0.1.0",
+  "description": "WebGPU matmul solver kernel for @btx-tools/challenges-sdk — byte-exact WGSL port of btxd's matmul service-challenge PoW",
+  "author": "visitor-code <visitor@friction.market>",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "prepublishOnly": "pnpm build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@webgpu/types": "^0.1.40",
+    "prettier": "^3.3.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "keywords": [
+    "btx",
+    "matmul",
+    "m31",
+    "webgpu",
+    "wgsl",
+    "captcha",
+    "mining",
+    "proof-of-work"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/btx-tools/btx-challenges-sdk.git",
+    "directory": "packages/matmul-webgpu"
+  },
+  "homepage": "https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/matmul-webgpu#readme",
+  "bugs": {
+    "url": "https://github.com/btx-tools/btx-challenges-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}
