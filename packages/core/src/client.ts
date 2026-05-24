@@ -406,8 +406,11 @@ export class BtxChallengeClient {
     // M-6 (audit 2026-05-24): validate the JSON-RPC error envelope defensively.
     // A truthy-but-malformed `error` (`true`, `"boom"`, `42`) would otherwise
     // throw BtxRpcError(undefined, undefined) and defeat callers branching on
-    // `err.code`. A well-formed object → BtxRpcError; anything else → BtxParseError.
-    if (data.error !== undefined && data.error !== null) {
+    // `err.code`. A well-formed object → BtxRpcError; truthy-but-malformed →
+    // BtxParseError. Entry stays a TRUTHY check (not `!== null`) so a falsy
+    // `error` (`null`/absent/`false`/`0`/`""`) is treated as success exactly as
+    // before — only a present, non-empty error is inspected (audit-pass LOW).
+    if (data.error) {
       const e = data.error as { code?: unknown; message?: unknown };
       if (typeof e === 'object' && ('code' in e || 'message' in e)) {
         throw new BtxRpcError(

@@ -137,6 +137,20 @@ describe('challengeToWasmArgs', () => {
     expect(() => challengeToWasmArgs(huge)).toThrow(/exceeds max/);
   });
 
+  // Audit M-1: the pure-JS solver must reject the same out-of-range n BEFORE the
+  // n×n allocation (parity with the kernel) — not OOM / RangeError.
+  it('solveJs throws on out-of-range n (not OOM)', () => {
+    const huge: Challenge = {
+      ...challenge,
+      challenge: {
+        ...challenge.challenge,
+        header_context: { ...challenge.challenge.header_context, matmul_dim: 70000 },
+        matmul: { ...challenge.challenge.matmul, n: 70000, b: 16 },
+      },
+    };
+    expect(() => solveJs(huge)).toThrow(/exceeds max/);
+  });
+
   it('throws when header_context seeds/dim differ from matmul seeds/n', () => {
     const divergent: Challenge = {
       ...challenge,

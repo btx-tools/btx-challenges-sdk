@@ -338,6 +338,23 @@ describe('btxAdmission — 403 reject path', () => {
     expect(res.status).toBe(403);
     expect(res.body.reason).toBe('already_redeemed');
   });
+
+  // Audit M-3: a verify-only result (valid:true but redeemed:false) must NOT admit.
+  it('denies 403 when valid:true but redeemed:false (not a real consume)', async () => {
+    const client = makeClient({
+      redeem: vi.fn().mockResolvedValue({ valid: true, reason: 'ok', redeemed: false }),
+    });
+    const app = makeApp({ client, purpose: 'r', resource: 'r', subject: 's' });
+
+    const res = await request(app)
+      .post('/gated')
+      .set(HEADER_CHALLENGE, JSON.stringify(STUB_CHALLENGE))
+      .set(HEADER_PROOF_NONCE, '01')
+      .set(HEADER_PROOF_DIGEST, '02')
+      .send({});
+
+    expect(res.status).toBe(403);
+  });
 });
 
 describe('btxAdmission — challenge binding enforcement (audit H-1)', () => {
