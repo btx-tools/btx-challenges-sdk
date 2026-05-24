@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BTX browser miner — reference demo</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: #0b0d10; color: #d7dde3; margin: 0; padding: 2rem; }
+      .wrap { max-width: 640px; margin: 0 auto; }
+      h1 { font-size: 1.1rem; letter-spacing: 0.02em; }
+      .banner { border: 1px solid #3a4250; background: #11151b; border-radius: 8px; padding: 0.8rem 1rem; margin: 1rem 0; color: #f0c674; }
+      .banner b { color: #ffd479; }
+      button { font: inherit; padding: 0.5rem 1.1rem; border-radius: 6px; border: 1px solid #3a4250; background: #18222e; color: #d7dde3; cursor: pointer; }
+      button:disabled { opacity: 0.45; cursor: default; }
+      .grid { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1.2rem; margin: 1rem 0; }
+      .grid .k { color: #8b97a5; }
+      .grid .v { color: #e8eef4; }
+      .controls { display: flex; gap: 1rem; align-items: center; margin: 1rem 0; }
+      input[type='range'] { width: 180px; }
+      #log { height: 150px; overflow: auto; border: 1px solid #2a313b; border-radius: 6px; padding: 0.5rem; background: #0e1217; font-size: 13px; color: #9fb0c0; }
+      .ok { color: #8fd18f; } .no { color: #d98c8c; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>BTX browser miner · reference demo</h1>
+      <div class="banner">
+        ⚠️ <b>This is not a money-maker.</b> A browser solves far slower than native hardware and
+        BTX's network is large, so your expected earnings are <b>≈ $0</b>. This demo exists to show
+        zero-install, consent-based "donate spare cycles" mining — never run a miner without the
+        visitor's explicit, visible opt-in.
+      </div>
+
+      <div class="controls">
+        <button id="toggle">Start mining</button>
+        <label>Throttle (GPU duty): <span id="dutyVal">50%</span><br /><input id="duty" type="range" min="10" max="100" value="50" /></label>
+      </div>
+
+      <div class="grid">
+        <div class="k">backend</div><div class="v" id="backend">—</div>
+        <div class="k">hashrate</div><div class="v" id="hashrate">0 nonce/s</div>
+        <div class="k">job</div><div class="v" id="job">—</div>
+        <div class="k">shares (accepted / rejected)</div><div class="v" id="shares">0 / 0</div>
+        <div class="k">attempts</div><div class="v" id="attempts">0</div>
+        <div class="k">estimated earnings</div><div class="v" id="earn">$0.00</div>
+      </div>
+
+      <div id="log"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

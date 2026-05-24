@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "@btx-tools/challenges-sdk": "../../../core/dist/index.js",
+    "@btx-tools/matmul-webgpu": "../../../matmul-webgpu/dist/index.js",
+    "@noble/hashes/": "../../../core/node_modules/@noble/hashes/"
+  }
+}

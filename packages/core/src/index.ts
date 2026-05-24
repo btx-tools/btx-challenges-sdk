@@ -15,7 +15,7 @@ export {
   type WasmSolveOptions,
   type WebGpuSolveOptions,
 } from './solver.js';
-export type { SolveJsOptions } from './matmul/pow.js';
+export { solveJs, validateMatmulParams, type SolveJsOptions } from './matmul/pow.js';
 export {
   BtxError,
   BtxHttpError,

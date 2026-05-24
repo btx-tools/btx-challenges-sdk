@@ -1,7 +1,7 @@
 {
-  "name": "@btx-tools/challenges-sdk",
-  "version": "1.4.0",
-  "description": "TypeScript SDK for BTX service challenges — chain-anchored proof-of-work admission control for APIs, agent gateways, and form submissions",
+  "name": "@btx-tools/browser-miner",
+  "version": "0.1.0",
+  "description": "Pool-agnostic browser mining client for BTX matmul service-challenge shares (WebGPU → WASM → pure-JS)",
   "author": "visitor-code <visitor@friction.market>",
   "license": "MIT",
   "type": "module",
@@ -31,15 +31,21 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
-    "test:perf": "vitest run tests/perf",
     "type-check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "prepublishOnly": "pnpm build"
   },
+  "peerDependencies": {
+    "@btx-tools/challenges-sdk": "^1.4.0"
+  },
+  "optionalDependencies": {
+    "@btx-tools/matmul-webgpu": "workspace:^",
+    "@btx-tools/matmul-wasm": "^0.1.0"
+  },
   "devDependencies": {
+    "@btx-tools/challenges-sdk": "workspace:*",
     "@types/node": "^22.0.0",
-    "msw": "^2.6.0",
+    "@webgpu/types": "^0.1.40",
     "prettier": "^3.3.0",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
@@ -47,23 +53,18 @@
   },
   "keywords": [
     "btx",
-    "service-challenges",
-    "matmul",
-    "post-quantum",
-    "captcha",
-    "admission",
-    "rate-limit",
-    "ai-gating",
-    "agent",
-    "mcp",
+    "mining",
+    "webgpu",
+    "browser",
+    "service-challenge",
     "proof-of-work"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/btx-tools/btx-challenges-sdk.git",
-    "directory": "packages/core"
+    "directory": "packages/browser-miner"
   },
-  "homepage": "https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/core#readme",
+  "homepage": "https://github.com/btx-tools/btx-challenges-sdk/tree/main/packages/browser-miner#readme",
   "bugs": {
     "url": "https://github.com/btx-tools/btx-challenges-sdk/issues"
   },
@@ -72,12 +73,5 @@
   },
   "engines": {
     "node": ">=20.19.0"
-  },
-  "dependencies": {
-    "@noble/hashes": "~2.2.0"
-  },
-  "optionalDependencies": {
-    "@btx-tools/matmul-wasm": "^0.1.0",
-    "@btx-tools/matmul-webgpu": "workspace:^"
   }
 }
