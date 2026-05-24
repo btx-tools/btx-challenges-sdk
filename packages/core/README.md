@@ -142,11 +142,12 @@ Error response bodies are scanned and `Authorization: Basic <token>` patterns ar
 
 ### `Solver`
 
-Three modes:
+Four modes:
 
 - **`'rpc'`** — delegates to btxd's `solvematmulservicechallenge` RPC. Server-side / Node only. Fast (sub-second to a few seconds) on a dedicated non-mining node — see the deployment note below.
-- **`'pure-js'`** — solves locally in pure TypeScript with `@noble/hashes` SHA-256. Browser-compatible. Slow at production difficulty (see the performance section); calibrate via `target_solve_time_s` for browser use.
-- **`'auto'`** (default) — picks `'rpc'` if `opts.rpcClient` is provided, else `'pure-js'`.
+- **`'wasm'`** — solves locally with the optional [`@btx-tools/matmul-wasm`](https://www.npmjs.com/package/@btx-tools/matmul-wasm) kernel: a byte-exact Rust→WASM port of the matmul PoW, **~24× faster than `'pure-js'`** (byte-identical proof). No node required. Throws a clear error if the package isn't installed. The published build targets **browsers/bundlers** (Vite, Next, Workers); in plain Node, build the package's `nodejs` target from source or use `'rpc'`.
+- **`'pure-js'`** — solves locally in pure TypeScript with `@noble/hashes` SHA-256. Browser-compatible, no optional package. Slowest at production difficulty (see the performance section).
+- **`'auto'`** (default) — picks `'rpc'` if `opts.rpcClient` is provided, else `'wasm'` if `@btx-tools/matmul-wasm` is installed, else `'pure-js'`.
 
 ```typescript
 import { BtxChallengeClient, Solver } from '@btx-tools/challenges-sdk';
@@ -155,13 +156,16 @@ import { BtxChallengeClient, Solver } from '@btx-tools/challenges-sdk';
 const client = new BtxChallengeClient({ rpcUrl: '...', rpcAuth: { ... } });
 const proof = await Solver.solve(challenge, { mode: 'rpc', rpcClient: client });
 
-// Browser / no-RPC (pure-JS mode): solves locally, no node required
+// No-node, fast (WASM mode): install `@btx-tools/matmul-wasm`, ~24× pure-JS
+const proof = await Solver.solve(challenge, { mode: 'wasm' });
+
+// Browser / no-RPC (pure-JS mode): solves locally, no optional package
 const proof = await Solver.solve(challenge, {
   mode: 'pure-js',
   pureJs: { maxTries: 5_000 },   // cap on attempts before giving up
 });
 
-// 'auto' (default) — picks rpc if a client is passed, else pure-js
+// 'auto' (default) — rpc if a client is passed, else wasm (if installed), else pure-js
 const proof = await Solver.solve(challenge, { rpcClient: client });
 ```
 
@@ -211,7 +215,7 @@ Expected end-to-end solve time depends on challenge difficulty. At btxd's lowest
 - Backend cron / batch jobs
 - Examples + demos with manually-issued low-difficulty challenges
 
-> **A WASM kernel won't rescue browser solving.** A 2026-05-23 spike measured a Rust/WASM port of the matmul hot loop at ~24.5× over pure-JS BigInt — but even a full WASM + SIMD + multi-worker stack lands ~1 hour at production difficulty, ~1000× over a 1–4 s captcha budget. The matmul proof is shaped for GPU-fast native mining, not the browser. **For production, solve server-side via `mode: 'rpc'` against a nearby non-mining btxd (~1–4 s).** Browser pure-JS remains reference-only. See [`USE-CASES.md`](https://github.com/btx-tools/btx-challenges-sdk/blob/main/USE-CASES.md).
+> **The WASM kernel ([`@btx-tools/matmul-wasm`](https://www.npmjs.com/package/@btx-tools/matmul-wasm)) makes no-node solving ~24× faster — but it is still not a casual browser captcha.** It's a byte-exact Rust→WASM port of the matmul hot loop (~24× over pure-JS BigInt; byte-identical proof). On an 8-worker browser pool a floor-difficulty solve is ~16 s, and difficulty calibrates to the chain's fast native solver — so a "1–4 s" challenge is multiple seconds-to-minutes in a browser at the live `n=512`. SIMD's 2–4× doesn't close that gap. The matmul proof is shaped for GPU-fast native mining. **Use `mode: 'wasm'` for fast no-node solving (server/edge, CLI, high-friction gates) and `mode: 'rpc'` against a nearby non-mining btxd (~1–4 s) for production server-side gating.** A casual sub-second browser captcha needs an upstream browser-friendly proof primitive. See [`USE-CASES.md`](https://github.com/btx-tools/btx-challenges-sdk/blob/main/USE-CASES.md).
 
 Reproduce the bench:
 

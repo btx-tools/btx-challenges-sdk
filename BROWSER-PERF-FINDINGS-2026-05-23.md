@@ -4,11 +4,13 @@
 > **Author**: SDK development
 > **Scope**: measure pure-JS solver wall-clock + measure WASM speedup via a Rust spike, decide whether browser captcha at 1-4s admission UX is achievable.
 
+> **Update (2026-05-24): the WASM kernel shipped** as [`@btx-tools/matmul-wasm`](https://www.npmjs.com/package/@btx-tools/matmul-wasm), wired into the SDK as `Solver` `mode: 'wasm'` (~24× pure-JS, byte-identical proof). **The decision below stands** — still not a casual 1–4 s browser captcha (full in-browser measurement: ~16 s floor on an 8-worker pool; 128 ms/attempt V8 · 165 ms Firefox at the live `n=512`; SIMD doesn't close it). What changed is positioning: the kernel is shipped as **the fastest no-node solver** (server/edge/CLI) and for **high-friction one-shot gates**, not shelved. Full measurement: `internal notes`.
+
 ## TL;DR — REVISED post-spike
 
-**Decision: BROWSER CAPTCHA AT 1-4s IS NOT VIABLE with the current BTX matmul proof primitive.** No combination of WASM + SIMD + multi-worker parallelism closes the ~1000× gap between browser-deployable solvers and the 1-4s UX budget at btx.dev's recommended production difficulty.
+**Decision: a CASUAL BROWSER CAPTCHA AT 1-4s IS NOT VIABLE with the current BTX matmul proof primitive.** No combination of WASM + SIMD + multi-worker parallelism closes the ~100× browser-vs-native gap to the 1-4s UX budget at btx.dev's recommended production difficulty.
 
-The SDK ships **server-side admission middleware** as the production path. Pure-JS Solver is reference-only for one-shot scripts, CI fixtures, and demonstrating the wire protocol. See [`USE-CASES.md`](./USE-CASES.md) for the recommendation table.
+The SDK ships **server-side admission middleware** as the production path, plus the optional `@btx-tools/matmul-wasm` kernel (`mode: 'wasm'`) as the fastest no-node solver. Pure-JS Solver is reference-only for one-shot scripts, CI fixtures, and demonstrating the wire protocol. See [`USE-CASES.md`](./USE-CASES.md) for the recommendation table.
 
 Browser captcha may become viable if the BTX team adds a browser-friendly proof primitive (Argon2-style memory-hard, smaller-n matmul variant, VDF) — that's an upstream protocol change tracked separately.
 

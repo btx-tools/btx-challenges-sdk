@@ -1,14 +1,14 @@
 # 03-browser-solver
 
-> ## ⚠️ This is a wire-protocol demonstration, NOT a production captcha
+> ## ⚠️ A wire-protocol + WASM-perf demonstration, NOT a casual captcha
 >
-> The pure-JS solver in this example takes **~7-60 minutes per attempt** at BTX's floor difficulty on an M-series Mac, and **~hours at production difficulty**. It is here to demonstrate that the issue → 402 → solve → 200 protocol works end-to-end from a browser, NOT to be deployed as a captcha widget.
+> Two pages: `index.html` solves with the **pure-JS** solver (~7-10 min per **solve** at floor difficulty on an M-series Mac); `bench.html` solves with the shipped **WASM** kernel ([`@btx-tools/matmul-wasm`](https://www.npmjs.com/package/@btx-tools/matmul-wasm)) across a Web Worker pool. Both demonstrate the issue → 402 → solve → 200 protocol end-to-end from a browser.
 >
-> **Browser captcha is not currently a viable product with the BTX matmul proof.** Per our 2026-05-23 WASM spike (`~/code/btx-challenges-wasm/`), no combination of WASM + SIMD + multi-worker parallelism closes the 1000× gap to the 1-4s budget btx.dev recommends. See [`../../USE-CASES.md`](../../USE-CASES.md) and [`../../BROWSER-PERF-FINDINGS-2026-05-23.md`](../../BROWSER-PERF-FINDINGS-2026-05-23.md) for the full analysis.
+> **The WASM kernel is ~24× pure-JS and byte-identical — but a browser is still not a casual captcha at the live `n=512`.** A floor-difficulty solve is ~16 s on an 8-worker pool (128 ms/attempt V8 · 165 ms Firefox), and SIMD's 2–4× doesn't close the ~100× browser-vs-native gap. See [`../../USE-CASES.md`](../../USE-CASES.md) and [`../../BROWSER-PERF-FINDINGS-2026-05-23.md`](../../BROWSER-PERF-FINDINGS-2026-05-23.md) for the full measurement.
 >
-> If you need a browser captcha: use hCaptcha, Cloudflare Turnstile, or Friendly Captcha. Watch for upstream BTX changes (new proof primitive) before adopting this for browser use.
+> WASM is great for **fast no-node solving** (server/edge/CLI) and **high-friction one-shot gates** (signup / KYC-alt, where ~16 s is acceptable). For a sub-second click-to-admit widget, use hCaptcha / Cloudflare Turnstile / Friendly Captcha until BTX ships a browser-friendly proof primitive.
 
-Single-page Vite app that drives the BTX admission flow from the browser. Uses a Web Worker so the matmul proof-of-work runs off the main thread and the page stays responsive.
+Vite app that drives the BTX admission flow from the browser. Uses Web Workers so the matmul proof-of-work runs off the main thread and the page stays responsive.
 
 ## Prereqs
 
@@ -38,10 +38,18 @@ Open the URL Vite prints (default `http://localhost:5173`), set the gate URL + c
 
 ## How it works
 
+**`index.html` (pure-JS flow):**
+
 1. **`src/main.ts` (UI thread)** — POSTs to the gate URL, reads the 402 challenge from the `X-BTX-Challenge` response header.
 2. **`src/solver.worker.ts` (Web Worker)** — receives the challenge via `postMessage`, calls `Solver.solve(challenge, { mode: 'pure-js' })`, posts back `{ nonce, digest, msElapsed }`.
 3. **`src/main.ts`** — POSTs again with the three proof headers (`X-BTX-Challenge`, `X-BTX-Proof-Nonce`, `X-BTX-Proof-Digest`), expects 200, records the timing.
 4. Repeat for N cycles.
+
+**`bench.html` (WASM worker-pool flow):**
+
+- **`src/bench.ts`** spawns N workers (`navigator.hardwareConcurrency`), each a **`src/wasm-solver.worker.ts`** running the `@btx-tools/matmul-wasm` `WasmSolver` over a **strided** nonce range (worker `k` of `N` scans `k, k+N, k+2N, …`); first to find a proof wins and the rest are terminated.
+- The WASM build is loaded from `wasm-pkg/` — rebuild it from the crate before running: `wasm-pack build --target web --release --out-dir <repo>/examples/03-browser-solver/wasm-pkg` (or copy the published `@btx-tools/matmul-wasm` web build there). `wasm-pkg/` is gitignored.
+- Includes a `[correctness]` check that solves the n=8 fixture in-browser and asserts the proof is byte-identical to the pure-JS reference.
 
 ## CORS
 
@@ -56,12 +64,13 @@ pnpm preview     # serve the built bundle locally
 
 The build is a fully static `index.html` + JS bundle + worker chunk. Nothing else server-side — though of course it still needs a reachable gate URL to talk to.
 
-## Perf notes (decision point for WASM)
+## Perf notes (pure-JS vs WASM)
 
-Browser pure-JS solve dominates total request time by orders of magnitude. The matmul kernel is BigInt-bound, which V8/JavaScriptCore optimize aggressively but can't match a native or WASM implementation.
+Browser pure-JS solve dominates total request time by orders of magnitude — the matmul kernel is BigInt-bound. The shipped WASM kernel is **~24× faster** (128 ms/attempt V8 · 165 ms Firefox at the live `n=512`), byte-identical proof:
 
-- If your adopters can tolerate 7-10 min/attempt at floor difficulty, pure-JS is fine.
-- If they can't, ship a WASM kernel — see [`../../BROWSER-PERF-FINDINGS-2026-05-23.md`](../../BROWSER-PERF-FINDINGS-2026-05-23.md) for the decision rationale and current path.
+- **`mode: 'wasm'`** (`bench.html`) — fast no-node solving; an 8-worker pool reaches a floor-difficulty solve in ~16 s. Recommended whenever there's no nearby btxd.
+- **`mode: 'pure-js'`** (`index.html`) — no optional dependency; ~7-10 min/solve at floor difficulty. Fine for demos and tolerant flows.
+- Neither is a sub-second casual captcha at `n=512`. See [`../../BROWSER-PERF-FINDINGS-2026-05-23.md`](../../BROWSER-PERF-FINDINGS-2026-05-23.md) for the full measurement and the upstream-primitive path.
 
 ## Troubleshooting
 

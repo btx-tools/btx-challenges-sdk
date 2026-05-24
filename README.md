@@ -75,7 +75,7 @@ This repo is a monorepo: the core SDK plus three framework adapters (install onl
 
 | Package                                                          | Description                                                          | npm                                                                                                                               |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| [`@btx-tools/challenges-sdk`](./packages/core)                   | Core RPC client + Solver (RPC + pure-JS modes) + algorithm port      | [![npm](https://img.shields.io/npm/v/@btx-tools/challenges-sdk)](https://www.npmjs.com/package/@btx-tools/challenges-sdk)         |
+| [`@btx-tools/challenges-sdk`](./packages/core)                   | Core RPC client + Solver (RPC + WASM + pure-JS modes) + algorithm port | [![npm](https://img.shields.io/npm/v/@btx-tools/challenges-sdk)](https://www.npmjs.com/package/@btx-tools/challenges-sdk)         |
 | [`@btx-tools/middleware-express`](./packages/middleware-express) | Express middleware adapter                                           | [![npm](https://img.shields.io/npm/v/@btx-tools/middleware-express)](https://www.npmjs.com/package/@btx-tools/middleware-express) |
 | [`@btx-tools/middleware-fastify`](./packages/middleware-fastify) | Fastify plugin adapter                                               | [![npm](https://img.shields.io/npm/v/@btx-tools/middleware-fastify)](https://www.npmjs.com/package/@btx-tools/middleware-fastify) |
 | [`@btx-tools/middleware-hono`](./packages/middleware-hono)       | Hono middleware adapter (Node + edge: Cloudflare Workers, Deno, Bun) | [![npm](https://img.shields.io/npm/v/@btx-tools/middleware-hono)](https://www.npmjs.com/package/@btx-tools/middleware-hono)       |
@@ -85,6 +85,7 @@ This repo is a monorepo: the core SDK plus three framework adapters (install onl
 | Package                                                                          | Description                                                                                                                                               | Repo                                                                      |
 | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | [`@btx-tools/mcp-gateway`](https://www.npmjs.com/package/@btx-tools/mcp-gateway) | **MCP server framework** that gates every tool invocation behind a BTX service-challenge proof — for agentic AI admission control. Companion to this SDK. | [btx-tools/btx-mcp-gateway](https://github.com/btx-tools/btx-mcp-gateway) |
+| [`@btx-tools/matmul-wasm`](https://www.npmjs.com/package/@btx-tools/matmul-wasm) | **WASM matmul solver kernel** — byte-exact Rust→WASM port of btxd's matmul PoW. Optional dep of the core SDK; powers `Solver` `mode: 'wasm'` (~24× pure-JS). Fast server/edge solving without a btxd. | [btx-tools/btx-challenges-wasm](https://github.com/btx-tools/btx-challenges-wasm) |
 
 ### Post-1.0 roadmap
 
@@ -96,13 +97,16 @@ This repo is a monorepo: the core SDK plus three framework adapters (install onl
 - **Python SDK** (`btx-challenges-py`) — server-side parity for Python stacks.
 - **LangChain / LlamaIndex bindings** — agent-tool admission for the popular orchestration frameworks.
 
-Browser-side solving remains out of scope until the BTX protocol offers a browser-friendly proof primitive (see `USE-CASES.md`).
+A **casual sub-second browser captcha** remains out of scope until the BTX protocol offers a browser-friendly proof primitive (see `USE-CASES.md`). The shipped `@btx-tools/matmul-wasm` kernel speeds up no-node solving ~24× — useful for server/edge and high-friction gates — but doesn't make the live `n=512` proof a 1–4 s casual captcha.
 
 ## Quickstart (for SDK consumers)
 
 ```bash
 # Core only (RPC client + browser-compatible Solver)
 npm install @btx-tools/challenges-sdk
+
+# Optional: ~24× faster no-node solving via the WASM kernel (enables Solver mode:'wasm')
+npm install @btx-tools/challenges-sdk @btx-tools/matmul-wasm
 
 # With an HTTP framework adapter — pick one
 npm install @btx-tools/challenges-sdk @btx-tools/middleware-express express
@@ -122,7 +126,7 @@ Then see the per-package README:
 
 ## What this SDK is (and isn't)
 
-> **Read [USE-CASES.md](./USE-CASES.md) before deciding to integrate.** This SDK is **server-side admission middleware** for chain-anchored proof-of-work gating. It is **not** a browser captcha library — per our 2026-05-23 WASM spike, browser pure-JS solving is ~1000× over the 1-4s captcha UX budget at production difficulty. Use the `mode: 'rpc'` path against a dedicated non-mining btxd for production deployments.
+> **Read [USE-CASES.md](./USE-CASES.md) before deciding to integrate.** This SDK is **server-side admission middleware** for chain-anchored proof-of-work gating. It is **not** a casual browser captcha library — even the optional `@btx-tools/matmul-wasm` kernel (~24× the pure-JS solver) leaves a floor-difficulty browser solve at ~16 s on an 8-worker pool at the live `n=512`, not the 1–4 s a click-to-admit widget needs. Use `mode: 'rpc'` against a dedicated non-mining btxd for production gating, or `mode: 'wasm'` for fast no-node solving (server/edge, CLI, high-friction gates).
 
 ## Examples
 
