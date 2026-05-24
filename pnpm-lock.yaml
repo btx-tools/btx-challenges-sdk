@@ -109,6 +109,9 @@ importers:
       '@btx-tools/matmul-wasm':
         specifier: ^0.1.0
         version: 0.1.1
+      '@btx-tools/matmul-webgpu':
+        specifier: workspace:^
+        version: link:../matmul-webgpu
 
   packages/matmul-webgpu:
     devDependencies:

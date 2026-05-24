@@ -29,10 +29,23 @@ import type { Challenge, SolverOutput } from './types.js';
  *   bounded by `BigInt`-based M31 multiplication. Prefer `'wasm'` when the
  *   kernel is installed; solve server-side via `'rpc'` at production difficulty.
  *
- * - `'auto'` — pick automatically: `'rpc'` if `opts.rpcClient` is provided,
- *   else `'wasm'` if `@btx-tools/matmul-wasm` is installed, else `'pure-js'`.
+ * - `'webgpu'` — solve locally on the GPU with the optional
+ *   [`@btx-tools/matmul-webgpu`](https://www.npmjs.com/package/@btx-tools/matmul-webgpu)
+ *   kernel (byte-identical proof to `'pure-js'`/`'wasm'`). Requires a WebGPU
+ *   runtime (`navigator.gpu`) — browsers, Deno `--unstable-webgpu`, or a
+ *   caller-supplied `opts.webgpu.device`. Throws a clear, distinct error if
+ *   WebGPU is unavailable here or the package isn't installed. Far faster than
+ *   `'wasm'`/`'pure-js'` per attempt; the production path for in-browser solving
+ *   (admission) and browser mining. Still bounded by browser GPU + network
+ *   difficulty — not free money (see the package README).
+ *
+ * - `'auto'` — pick automatically: `'rpc'` if `opts.rpcClient` is provided, else
+ *   `'webgpu'` if WebGPU + `@btx-tools/matmul-webgpu` are available, else
+ *   `'wasm'` if `@btx-tools/matmul-wasm` is installed, else `'pure-js'`. Once a
+ *   local kernel is selected, its solve errors surface — there is no second
+ *   fallback (a bad-input/range error would just re-throw on the next kernel).
  */
-export type SolverMode = 'rpc' | 'pure-js' | 'wasm' | 'auto';
+export type SolverMode = 'rpc' | 'pure-js' | 'wasm' | 'webgpu' | 'auto';
 
 /** Options forwarded to the WASM solver (`Solver.solve` with `mode: 'wasm'`). */
 export interface WasmSolveOptions {
@@ -40,6 +53,18 @@ export interface WasmSolveOptions {
   maxTries?: number;
   /** Override the starting nonce (default: challenge.header_context.nonce64_start). */
   nonceStart?: bigint;
+}
+
+/** Options forwarded to the WebGPU solver (`Solver.solve` with `mode: 'webgpu'`). */
+export interface WebGpuSolveOptions {
+  /** Max nonces to try before giving up. Default 1_000_000 (must keep the range within [0, 2³²)). */
+  maxTries?: number;
+  /** Override the starting nonce (default: challenge.header_context.nonce64_start). */
+  nonceStart?: bigint;
+  /** Provide a `GPUDevice` (e.g. plain Node with a polyfill, or to reuse one). Default: `navigator.gpu`. */
+  device?: unknown;
+  /** Nonces per GPU batch. Default: auto-clamped from `device.limits` and `n`. */
+  batchSize?: number;
 }
 
 /** Options for {@link Solver.solve}. */
@@ -55,6 +80,8 @@ export interface SolverOptions {
   pureJs?: SolveJsOptions;
   /** Forwarded to the WASM solver. Ignored for other modes. */
   wasm?: WasmSolveOptions;
+  /** Forwarded to the WebGPU solver. Ignored for other modes. */
+  webgpu?: WebGpuSolveOptions;
 }
 
 /**
@@ -129,13 +156,19 @@ export class Solver {
     switch (mode) {
       case 'rpc':
         return solveViaRpc(challenge, opts);
+      case 'webgpu':
+        return solveViaWebGpu(challenge, opts);
       case 'wasm':
         return solveViaWasm(challenge, opts);
       case 'pure-js':
         return solveViaPureJs(challenge, opts);
       case 'auto': {
-        // rpc (if a node is reachable) → wasm (if the kernel is usable) → pure-js.
+        // rpc (if a node is reachable) → webgpu (if GPU + kernel) → wasm (if kernel) → pure-js.
         if (opts.rpcClient) return solveViaRpc(challenge, opts);
+        if (hasWebGpu()) {
+          const gpu = await loadWebGpu();
+          if (gpu.kind === 'ok') return solveWithWebGpuFactory(challenge, gpu.create, opts.webgpu);
+        }
         const load = await loadWasm();
         if (load.kind === 'ok') return solveWithWasmCtor(challenge, load.Ctor, opts.wasm);
         return solveViaPureJs(challenge, opts);
@@ -359,5 +392,150 @@ async function solveViaWasm(challenge: Challenge, opts: SolverOptions): Promise<
     'Solver.solve: mode="wasm" found @btx-tools/matmul-wasm but could not initialize it here. ' +
       'The published build targets browsers/bundlers (Vite, Next, Workers); in plain Node, build ' +
       `the package's nodejs target from source or use mode "rpc" / "pure-js". (cause: ${cause})`,
+  );
+}
+
+// ----------------------------------------------------------------------------
+// WebGPU solver (optional @btx-tools/matmul-webgpu)
+// ----------------------------------------------------------------------------
+
+/** Minimal structural shape of `@btx-tools/matmul-webgpu`'s solution. */
+interface WebGpuSolution {
+  readonly nonce_hex: string;
+  readonly digest_hex: string;
+}
+/** Construction knobs forwarded to the kernel's `init` (typed loosely — optional dep). */
+interface WebGpuInit {
+  device?: unknown;
+  batchSize?: number;
+}
+/** A configured WebGPU solver handle (see `@btx-tools/matmul-webgpu`'s `WebGpuSolver`). */
+interface WebGpuSolverHandle {
+  solveChunk(
+    nonceStart: bigint,
+    stride: bigint,
+    maxTries: bigint,
+  ): Promise<WebGpuSolution | undefined>;
+  destroy(): void;
+}
+/**
+ * `@btx-tools/matmul-webgpu`'s `createWebGpuSolver`. Takes the **same positional
+ * args as {@link WasmSolverArgs}** (so {@link challengeToWasmArgs} maps both), plus
+ * an optional `init`, and resolves to a handle. Async — WebGPU device acquisition is async.
+ */
+export type WebGpuFactory = (
+  ...args: [...WasmSolverArgs, WebGpuInit?]
+) => Promise<WebGpuSolverHandle>;
+
+/** Is a WebGPU runtime present in this environment? */
+function hasWebGpu(): boolean {
+  return typeof navigator !== 'undefined' && !!(navigator as { gpu?: unknown }).gpu;
+}
+
+/**
+ * Resolve `createWebGpuSolver` from an already-imported module (named export or
+ * `default.createWebGpuSolver`, mirroring {@link resolveWasmCtor}). Throws if the
+ * module can't yield the factory. Exposed for tests.
+ */
+export function resolveWebGpuFactory(mod: unknown): WebGpuFactory {
+  const m = mod as { default?: unknown; createWebGpuSolver?: unknown };
+  const fromDefault = (m.default as { createWebGpuSolver?: unknown } | undefined)
+    ?.createWebGpuSolver;
+  const fn = m.createWebGpuSolver ?? fromDefault;
+  if (typeof fn !== 'function') {
+    throw new Error('@btx-tools/matmul-webgpu did not export a createWebGpuSolver function');
+  }
+  return fn as WebGpuFactory;
+}
+
+/**
+ * Solve with a provided factory. Maps the challenge via {@link challengeToWasmArgs}
+ * (reusing its C-1 seed/dim guard), runs a single chunk, and **always
+ * `destroy()`s** the GPU resources. Exposed for tests; production goes through
+ * {@link Solver.solve}.
+ */
+export async function solveWithWebGpuFactory(
+  challenge: Challenge,
+  create: WebGpuFactory,
+  opts: WebGpuSolveOptions = {},
+): Promise<SolverOutput> {
+  const args = challengeToWasmArgs(challenge);
+  const init: WebGpuInit = {};
+  if (opts.device !== undefined) init.device = opts.device;
+  if (opts.batchSize !== undefined) init.batchSize = opts.batchSize;
+  const solver = await create(...args, init);
+  try {
+    const nonceStart =
+      opts.nonceStart ?? BigInt(challenge.challenge.header_context.nonce64_start ?? 0);
+    const maxTries = BigInt(opts.maxTries ?? 1_000_000);
+    const sol = await solver.solveChunk(nonceStart, 1n, maxTries);
+    if (!sol) {
+      throw new Error(
+        `Solver.solve: webgpu solver exhausted maxTries=${maxTries} without finding a proof. ` +
+          'Increase maxTries or lower challenge difficulty (target_solve_time_s).',
+      );
+    }
+    const { nonce_hex, digest_hex } = sol;
+    return {
+      nonce64_hex: nonce_hex,
+      digest_hex,
+      proof: { challenge, nonce64_hex: nonce_hex, digest_hex },
+    };
+  } finally {
+    solver.destroy();
+  }
+}
+
+/** Outcome of probing the optional `@btx-tools/matmul-webgpu` kernel. */
+type WebGpuLoad =
+  | { kind: 'ok'; create: WebGpuFactory }
+  | { kind: 'absent' }
+  | { kind: 'init-failed'; cause: unknown };
+
+// Memoized probe (mirrors loadWasm's cache discipline).
+let cachedWebGpuLoad: WebGpuLoad | undefined;
+
+async function loadWebGpu(): Promise<WebGpuLoad> {
+  if (cachedWebGpuLoad !== undefined) return cachedWebGpuLoad;
+  const spec = '@btx-tools/matmul-webgpu';
+  let mod: unknown;
+  try {
+    mod = await import(spec);
+  } catch (err) {
+    const code = (err as { code?: unknown })?.code;
+    if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
+      cachedWebGpuLoad = { kind: 'absent' }; // genuine "not installed" is permanent
+      return cachedWebGpuLoad;
+    }
+    return { kind: 'absent' }; // transient import error left uncached (retryable)
+  }
+  try {
+    const ok: WebGpuLoad = { kind: 'ok', create: resolveWebGpuFactory(mod) };
+    cachedWebGpuLoad = ok; // success is permanent
+    return ok;
+  } catch (cause) {
+    return { kind: 'init-failed', cause }; // installed but no factory export — uncached
+  }
+}
+
+async function solveViaWebGpu(challenge: Challenge, opts: SolverOptions): Promise<SolverOutput> {
+  if (!hasWebGpu() && opts.webgpu?.device === undefined) {
+    throw new Error(
+      'Solver.solve: mode="webgpu" needs a WebGPU runtime (navigator.gpu) or opts.webgpu.device. ' +
+        'None available here — use mode "rpc" / "wasm" / "pure-js", or run in a WebGPU-capable environment.',
+    );
+  }
+  const load = await loadWebGpu();
+  if (load.kind === 'ok') return solveWithWebGpuFactory(challenge, load.create, opts.webgpu);
+  if (load.kind === 'absent') {
+    throw new Error(
+      'Solver.solve: mode="webgpu" requires the optional @btx-tools/matmul-webgpu package. ' +
+        'Install it (e.g. `npm i @btx-tools/matmul-webgpu`), or use mode "rpc" / "wasm" / "pure-js".',
+    );
+  }
+  const cause = load.cause instanceof Error ? load.cause.message : String(load.cause);
+  throw new Error(
+    'Solver.solve: mode="webgpu" found @btx-tools/matmul-webgpu but could not initialize it here. ' +
+      `(cause: ${cause})`,
   );
 }

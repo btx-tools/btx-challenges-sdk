@@ -12,3 +12,4 @@ coverage/
 .turbo/
 *.tgz
 docs-site/
+deno.lock

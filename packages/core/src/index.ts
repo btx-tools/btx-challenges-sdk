@@ -8,7 +8,13 @@
  */
 
 export { BtxChallengeClient } from './client.js';
-export { Solver, type SolverOptions, type SolverMode, type WasmSolveOptions } from './solver.js';
+export {
+  Solver,
+  type SolverOptions,
+  type SolverMode,
+  type WasmSolveOptions,
+  type WebGpuSolveOptions,
+} from './solver.js';
 export type { SolveJsOptions } from './matmul/pow.js';
 export {
   BtxError,

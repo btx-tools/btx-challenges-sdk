@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "@btx-tools/matmul-webgpu": "../../../matmul-webgpu/dist/index.js",
+    "@noble/hashes/": "../../node_modules/@noble/hashes/"
+  }
+}
