@@ -48,7 +48,7 @@ Open the URL Vite prints (default `http://localhost:5173`), set the gate URL + c
 **`bench.html` (WASM worker-pool flow):**
 
 - **`src/bench.ts`** spawns N workers (`navigator.hardwareConcurrency`), each a **`src/wasm-solver.worker.ts`** running the `@btx-tools/matmul-wasm` `WasmSolver` over a **strided** nonce range (worker `k` of `N` scans `k, k+N, k+2N, …`); first to find a proof wins and the rest are terminated.
-- The WASM build is loaded from `wasm-pkg/` — rebuild it from the crate before running: `wasm-pack build --target web --release --out-dir <repo>/examples/03-browser-solver/wasm-pkg` (or copy the published `@btx-tools/matmul-wasm` web build there). `wasm-pkg/` is gitignored.
+- The WASM kernel is the **`@btx-tools/matmul-wasm`** dependency (resolved from npm); Vite bundles its `.js` + `.wasm` asset for the worker — no separate build step.
 - Includes a `[correctness]` check that solves the n=8 fixture in-browser and asserts the proof is byte-identical to the pure-JS reference.
 
 ## CORS

@@ -4,8 +4,8 @@
  * WASM instance (workers don't share memory) — the pool's parallelism is across
  * worker threads, not shared state.
  */
-import init, { WasmSolver } from '../wasm-pkg/btx_challenges_wasm.js';
-import wasmUrl from '../wasm-pkg/btx_challenges_wasm_bg.wasm?url';
+import init, { WasmSolver } from '@btx-tools/matmul-wasm';
+import wasmUrl from '@btx-tools/matmul-wasm/btx_challenges_wasm_bg.wasm?url';
 
 export interface SolveRequest {
   jobId: number;

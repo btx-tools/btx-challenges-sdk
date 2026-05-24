@@ -67,6 +67,9 @@ importers:
       '@btx-tools/challenges-sdk':
         specifier: workspace:*
         version: link:../../packages/core
+      '@btx-tools/matmul-wasm':
+        specifier: ^0.1.0
+        version: 0.1.1
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -2016,8 +2019,7 @@ packages:
 
 snapshots:
 
-  '@btx-tools/matmul-wasm@0.1.1':
-    optional: true
+  '@btx-tools/matmul-wasm@0.1.1': {}
 
   '@esbuild/aix-ppc64@0.21.5':
     optional: true

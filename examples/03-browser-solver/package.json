@@ -11,7 +11,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@btx-tools/challenges-sdk": "workspace:*"
+    "@btx-tools/challenges-sdk": "workspace:*",
+    "@btx-tools/matmul-wasm": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
