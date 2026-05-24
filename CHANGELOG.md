@@ -4,7 +4,41 @@ All notable changes to packages in this workspace are documented here. Format fo
 
 ## [Unreleased]
 
-## [1.2.0] - 2026-05-24 — `challenges-sdk` 1.2.0 + middleware-\* 1.1.0 (audit remediation) — pending publish
+## [1.4.0] - 2026-05-25 — `challenges-sdk` 1.4.0 + new `matmul-webgpu@0.1.0` & `browser-miner@0.1.0`
+
+WebGPU support: a byte-exact WGSL port of the matmul service-challenge solver, a new
+SDK solve mode that uses it, and a pool-agnostic browser mining client built on top.
+All byte-exact-validated on real GPU (Deno/Metal) and deep-audited. (`challenges-sdk`
+`1.3.0` — the `mode:'webgpu'` work — was never published; this is the `1.2.0 → 1.4.0`
+release.)
+
+### `@btx-tools/challenges-sdk` 1.4.0
+
+- **`Solver` `mode:'webgpu'`** — solve locally on the GPU via the optional
+  `@btx-tools/matmul-webgpu` kernel (byte-identical proof to `'pure-js'`/`'wasm'`).
+  Requires `navigator.gpu` (browser / Deno) or a caller-supplied `opts.webgpu.device`;
+  throws a clear, distinct error otherwise. The `'auto'` cascade is now
+  `rpc → webgpu → wasm → pure-js`. **Node behavior is unchanged** (no `navigator.gpu`
+  → webgpu skipped). New `WebGpuSolveOptions`; `optionalDependencies` += `matmul-webgpu`.
+- **Exports `solveJs` + `validateMatmulParams`** — the reference solver (returns
+  `null` on exhaustion) and the n/b/r bounds check, now public (consumed by
+  `@btx-tools/browser-miner`).
+
+### `@btx-tools/matmul-webgpu` 0.1.0 (new)
+
+WebGPU/WGSL solver kernel — a clean-room port of `core/src/matmul/*.ts`, byte-exact at
+n=8/n=64 (multi-block transcript) and ~50× faster per matmul than the WASM solver.
+`createWebGpuSolver(...)` mirrors `WasmSolver`'s positional args. Dual `MIT OR Apache-2.0`.
+
+### `@btx-tools/browser-miner` 0.1.0 (new)
+
+Pool-agnostic browser mining client for service-challenge shares: `MiningPoolAdapter`
+contract + a `BrowserMiner` loop (backend cascade `webgpu→wasm→pure-js`, vardiff, GPU
+duty-cycle throttling, new-job preemption, consent-gated). Peer `challenges-sdk@^1.4.0`.
+**Honest framing:** browser mining earns ≈ nothing — engagement/decentralization, not
+a money-maker. MIT.
+
+## [1.2.0] - 2026-05-24 — `challenges-sdk` 1.2.0 + middleware-\* 1.1.0 (audit remediation)
 
 Security + correctness fixes from the 2026-05-24 org-wide deep audit (no Critical;
 this hardens the admission boundary + input validation). Coordinated minor across
